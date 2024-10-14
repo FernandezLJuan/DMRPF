@@ -38,6 +38,7 @@ public:
 
     void pauseSim();
     void resumeSim();
+    void onClick(int);
 
     /*ENVIRONMENT MODIFICATION*/
     void updateEnvironment(); /*updates robot positions, cell neighbors and spawns random obstacles*/
@@ -86,6 +87,7 @@ private:
 
     std::vector<std::shared_ptr<Cell>> cells; /*each cell on the environment*/
     std::vector<Robot*> robots; /*each robot on the environment*/
+    Robot* selectedRobot = nullptr;
 
 };
 

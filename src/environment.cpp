@@ -20,7 +20,6 @@ void Env::createGrid(){
 }
 
 void Env::connectCells(){
-
     /*directions of cells to be added*/
     std::vector<std::pair<int, int>> directions = {
         {0,-1},{0,1},{-1,0},{1,0},
@@ -83,7 +82,6 @@ int Env::connectionCost(Cell& cell1, Cell& cell2){
 }
 
 void Env::addEdge(int id1, int id2, int cost){
-
     if(getCellByID(id1)->isObstacle() || getCellByID(id2)->isObstacle()){
         return;
     } /*don't add edge if one of the cells is an obstacle*/
@@ -98,7 +96,6 @@ void Env::removeEdge(int id1, int id2){
 }
 
 void Env::addObstacle(int id){
-
     if(id<0 || id>=(this->cols*this->rows) || cells[id]->getObjID()!=nullptr || cells[id]->isGoal()){
         return;
     }
@@ -115,7 +112,6 @@ void Env::addObstacle(int id){
 }
 
 void Env::removeObstacle(int id){
-
     if(id<0 || id>=(this->cols*this->rows)){
         return;
     }
@@ -152,11 +148,9 @@ void Env::removeObstacle(int id){
 
     /*update neighbor list of current cell*/
     //cells[id]->updateNeighbors(adjMatrix, *this);
-
 }
 
 void Env::addGoal(int id){
-
     /*if the cell was an obstacle, remove it from the environment to redo connections*/
     if(cells[id]->isObstacle()){
         removeObstacle(id);
@@ -165,8 +159,11 @@ void Env::addGoal(int id){
     cells[id]->setType(cellType::CELL_GOAL);
 }
 
+void Env::removeGoal(int id){
+    cells[id]->setType(cellType::CELL_FREE);
+}
+
 int Env::placeRobot(Robot* r){
-    
     std::array<int, 2> robotPos = r->getPos();
     std::cout<<"trying to place robot at: "<<robotPos[0]<<","<<robotPos[1]<<std::endl;
     int posID = robotPos[0] * cols + robotPos[1]; /*id of cell at robot position*/
@@ -186,7 +183,6 @@ int Env::placeRobot(Robot* r){
 }
 
 int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
-
     /*never move robot if the next cell already has a robot in it*/
     if(nextCell->getObjID()){
         return -1;
@@ -212,7 +208,36 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
     else{
         return -1;
     }
+}
 
+void Env::onClick(int id){
+    if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)){
+        if(cells[id]->getObjID()){ /*if the cell has a robot, select that robot*/
+            if(!selectedRobot){
+                selectedRobot = cells[id]->getObjID();
+            }
+        }
+        else if (selectedRobot && !selectedRobot->getGoal()){ /*if the selected robot doesn't have a goal already*/
+            selectedRobot->setGoal((Vector2){static_cast<float>(id / cols), static_cast<float>(id % cols)});
+        }
+        else if(!selectedRobot){/*if there is no selected robot*/
+            addObstacle(id);
+        }
+    }
+
+    if(IsMouseButtonDown(MOUSE_BUTTON_RIGHT)){
+        if(selectedRobot){ /*if there is a selected robot*/
+            if(cells[id]->isGoal()){/*and the cell is a goal, remove the goal*/
+                selectedRobot->removeGoal();
+            }
+            else{
+                selectedRobot = nullptr; /*if the cell is not a goal but a robot is selected, un-select the robot*/
+            }
+        }
+        else{
+            removeObstacle(id);
+        }
+    }
 }
 
 void Env::pauseSim(){
@@ -250,14 +275,12 @@ std::vector<std::shared_ptr<Cell>> Env::getCells(){return cells;}
 std::vector<Robot*> Env::getRobots(){return robots;}
 
 void Env::logAdj(){
-
     for(auto v : adjMatrix){
         for(int element : v){
             std::cout<<element<<", ";
         }
         std::cout<<std::endl;
     }
-
 }
 
 /* DRAWING THE ENVIRONMENT */
@@ -314,6 +337,7 @@ void GridRenderer::draw(Env& env) {
             }
 
             if (cell->isGoal()) {
+                //std::cout << "Drawing goal at cell: " << cell->getID() << std::endl;
                 DrawCircle(rect.x + rect.width / 2, rect.y + rect.height / 2, radius / 2, GREEN);
             }
 
