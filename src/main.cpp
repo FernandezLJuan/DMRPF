@@ -98,25 +98,26 @@ int main(int argc, char* argv[]){
             float deltaTime = GetFrameTime();
             timeElapsed += deltaTime;
 
+            Vector2 mousePos = GetMousePosition();
+            mouseID = posToID(*grid,mousePos);
+
             if(timeElapsed>=timeStep){
+                grid->onClick(mouseID);
                 grid->updateEnvironment();
                 timeElapsed = 0.0;
             }
-
-            Vector2 mousePos = GetMousePosition();
-            mouseID = posToID(*grid,mousePos);
 
             BeginDrawing();
             ClearBackground(WHITE);
 
             /*left click on a cell creates obstacle*/
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+            /* if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                 grid->addObstacle(mouseID);
             }
-            /*right click on a cell removes obstacle*/
+            /*right click on a cell removes obstacle
             if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)){
                 grid->removeObstacle(mouseID);
-            }
+            } */
 
             if(IsKeyDown(KEY_ENTER)){
                 grid->resumeSim();
