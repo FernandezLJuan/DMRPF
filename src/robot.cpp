@@ -17,7 +17,9 @@ void Robot::takeAction(){
     else{
         /*move the robot to the next cell*/
         this->resumeRobot();
-        this->move(path.front());
+        if(!path.empty()) {
+            this->move(path.front());
+        }
     }
 }
 
@@ -26,6 +28,8 @@ void Robot::generatePath(){
     if(goal==nullptr){
         return;
     }
+
+    path = {};
 
     Vector2 start = {posX, posY};
 
@@ -42,18 +46,18 @@ void Robot::generatePath(){
         path.push(goal);
     }
 
-    path.pop();
+    path.pop(); /*eliminate current position*/
 }
 
 void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the robot*/
 
-    if(newPos==nullptr){
-        return;
-    }
-
     if (currentCell == goal) {
         std::cout << "Robot reached the goal!" << std::endl;
         path = std::queue<std::shared_ptr<Cell>>(); // Vacía el path
+        return;
+    }
+
+    if(newPos==nullptr){
         return;
     }
 
@@ -158,8 +162,15 @@ void Robot::logPos(){
 
 void Robot::setGoal(Vector2 goalPos){
     goal = environment->getCellByPos(goalPos.x, goalPos.y);
-    environment->addGoal(goal->getID());
+    if(goal != currentCell){
+        environment->addGoal(goal->getID());
+    }
     this->generatePath();
+}
+
+void Robot::removeGoal(){
+    environment->removeGoal(goal->getID());
+    goal = nullptr;
 }
 
 bool Robot::isMoving(){
@@ -171,6 +182,8 @@ int Robot::getID(){
 }
 
 std::shared_ptr<Cell> Robot::getCurrentCell(){return this->currentCell;}
+
+std::shared_ptr<Cell> Robot::getGoal(){return this->goal;}
 
 std::array<int, 2> Robot::getPos(){
     std::array<int,2> p{static_cast<int>(posX), static_cast<int>(posY)};
