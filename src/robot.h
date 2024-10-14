@@ -31,8 +31,10 @@ public:
     std::array<int, 2> getPos(); /*get x,y position on the grid (is it redundant?)*/
     std::shared_ptr<Cell> getCurrentCell();
     std::vector<std::shared_ptr<Cell>> getArea(); /*retyurn detection area, used for drawing*/
+    std::shared_ptr<Cell> getGoal();
     void logPos();
     void setGoal(Vector2);/*set goal at x,y position*/
+    void removeGoal();
 
 private:
 
