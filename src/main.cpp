@@ -75,13 +75,14 @@ int main(int argc, char* argv[]){
 
     std::shared_ptr<Env> grid = std::make_shared<Env>(e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols); /*initializes the environment*/
     Robot r1(0,0, grid.get());
-    r1.setGoal((Vector2){0,5});
 
     Robot r2(4,0,grid.get());
-    r2.setGoal((Vector2){4,5});
 
     grid->placeRobot(&r1);
+    r1.setGoal((Vector2){0,5});
+
     grid->placeRobot(&r2);
+    r2.setGoal((Vector2){4,5});
 
     GridRenderer renderer(800,800,8,8);
 
@@ -109,15 +110,6 @@ int main(int argc, char* argv[]){
 
             BeginDrawing();
             ClearBackground(WHITE);
-
-            /*left click on a cell creates obstacle*/
-            /* if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
-                grid->addObstacle(mouseID);
-            }
-            /*right click on a cell removes obstacle
-            if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)){
-                grid->removeObstacle(mouseID);
-            } */
 
             if(IsKeyDown(KEY_ENTER)){
                 grid->resumeSim();
