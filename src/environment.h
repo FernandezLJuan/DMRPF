@@ -39,6 +39,7 @@ public:
     void pauseSim();
     void resumeSim();
     void onClick(int);
+    int cellDistance(Cell&, Cell&);
 
     /*ENVIRONMENT MODIFICATION*/
     void updateEnvironment(); /*updates robot positions, cell neighbors and spawns random obstacles*/

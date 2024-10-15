@@ -11,7 +11,6 @@ void Env::createGrid(){
             cells.emplace_back(std::make_shared<Cell>(currentIdx, i, j)); /*avoids creating unnecesary copy of Cell*/
             isObstacle = obstacleDist(rng);
             if(isObstacle < this->obstacleProbability){
-                //if((i+j)!=0) /*first cell shouldn't be an obstacle, right now*/
                 cells.back()->setType(cellType::CELL_OBSTACLE);
             }
         }
@@ -45,7 +44,7 @@ void Env::connectCells(){
                 }
             }
 
-            //cells[currentIdx]->updateNeighbors(adjMatrix, *this);
+            cells[currentIdx]->updateNeighbors(adjMatrix, *this);
         }
     }
 }
@@ -142,12 +141,12 @@ void Env::removeObstacle(int id){
             int neighborIdx = ni*this->cols + nj;
 
             addEdge(id, neighborIdx, connectionCost);
-            //cells[neighborIdx]->updateNeighbors(adjMatrix, *this);
+            cells[neighborIdx]->updateNeighbors(adjMatrix, *this);
         }
     }
 
     /*update neighbor list of current cell*/
-    //cells[id]->updateNeighbors(adjMatrix, *this);
+    cells[id]->updateNeighbors(adjMatrix, *this);
 }
 
 void Env::addGoal(int id){
@@ -211,11 +210,15 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
 }
 
 void Env::onClick(int id){
+
+    if(id<0 || id>cells.size()){
+        return;
+    }
+
     if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)){
         if(cells[id]->getObjID()){ /*if the cell has a robot, select that robot*/
-            if(!selectedRobot){
-                selectedRobot = cells[id]->getObjID();
-            }
+            selectedRobot = cells[id]->getObjID();
+            std::cout<<"Selected robot "<<selectedRobot->getID()<<std::endl;
         }
         else if (selectedRobot && !selectedRobot->getGoal()){ /*if the selected robot doesn't have a goal already*/
             selectedRobot->setGoal((Vector2){static_cast<float>(id / cols), static_cast<float>(id % cols)});
@@ -231,6 +234,7 @@ void Env::onClick(int id){
                 selectedRobot->removeGoal();
             }
             else{
+                std::cout<<"Unselected robot "<<selectedRobot->getID()<<std::endl;
                 selectedRobot = nullptr; /*if the cell is not a goal but a robot is selected, un-select the robot*/
             }
         }
@@ -269,6 +273,16 @@ std::array<int, 2> Env::cellDims(){
 std::array<int, 2> Env::origin(){
     std::array<int,2> ox{this->originX, this->originY};
     return ox;
+}
+
+int Env::cellDistance(Cell& cell1, Cell& cell2){
+
+    std::array<int, 2> pos1 = cell1.getPos();
+    std::array<int, 2> pos2 = cell2.getPos();
+
+    int mDistance = abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1]); /*manhattan distance between cells*/
+
+    return mDistance;
 }
 
 std::vector<std::shared_ptr<Cell>> Env::getCells(){return cells;}
