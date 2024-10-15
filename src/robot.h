@@ -1,7 +1,9 @@
 #pragma once
 #include "environment.h"
-#include <queue>
+#include <stack>
+#include <set>
 #include <unordered_set>
+#include <unordered_map>
 
 class Env;
 class Cell;
@@ -11,6 +13,7 @@ public:
 
     Robot(int x, int y,Env* env): id(assignID()), posX(x), posY(y), environment(env){
         currentCell = environment->getCellByPos(posX, posY);
+        path.push(currentCell);
         this->updateDetectionArea();
     }
 
@@ -19,6 +22,7 @@ public:
     bool isMoving();
     void stopRobot();
     void resumeRobot();
+    void reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>>, std::shared_ptr<Cell>);
 
     void updateDetectionArea();
     void takeAction();
@@ -61,7 +65,7 @@ private:
     Env* environment; /*environment the robot is on*/
 
     std::shared_ptr<Cell> currentCell; /*in which cell is the robot currently?*/
-    std::queue<std::shared_ptr<Cell>> path; /*path the robot follows when moving*/
+    std::stack<std::shared_ptr<Cell>> path; /*path the robot follows when moving*/
     std::vector<std::shared_ptr<Cell>> detectionArea; /*cells in which the robot can detect robots*/
     std::vector<Robot*> neighborsRequestingNode; /*robots requesting the current node*/
 };
