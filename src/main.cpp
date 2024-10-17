@@ -42,7 +42,7 @@ int main(int argc, char* argv[]){
     }
 
     /*settings for window and environment*/
-    int e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols;
+    int e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols, e_robs;
     int w_width, w_height;
     std::string w_title;
 
@@ -64,6 +64,8 @@ int main(int argc, char* argv[]){
     const libconfig::Setting& gridDims = environment["gridDims"];
     const libconfig::Setting& origin = environment["origin"];
     
+    environment.lookupValue("n_robots", e_robs);
+    
     cellDims.lookupValue("w", e_cellW);
     cellDims.lookupValue("h", e_cellH);
 
@@ -73,16 +75,7 @@ int main(int argc, char* argv[]){
     origin.lookupValue("x", e_posX);
     origin.lookupValue("y", e_posY);
 
-    std::shared_ptr<Env> grid = std::make_shared<Env>(e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols); /*initializes the environment*/
-    Robot r1(0,0, grid.get());
-
-    Robot r2(4,0,grid.get());
-
-    grid->placeRobot(&r1);
-    r1.setGoal((Vector2){0,5});
-
-    grid->placeRobot(&r2);
-    r2.setGoal((Vector2){4,5});
+    std::shared_ptr<Env> grid = std::make_shared<Env>(e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols, e_robs); /*initializes the environment*/
 
     GridRenderer renderer(800,800,8,8);
 
@@ -116,6 +109,9 @@ int main(int argc, char* argv[]){
             }
             if(IsKeyDown(KEY_SPACE)){
                 grid->pauseSim();
+            }
+            if(IsKeyPressed(KEY_R)){
+                grid->remakePaths();
             }
 
             renderer.draw(*grid);
