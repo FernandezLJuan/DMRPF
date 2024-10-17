@@ -11,28 +11,29 @@ void Robot::takeAction(){
     double willIStop = dis(gen);
 
     if(willIStop<waitProbability){
-        //std::cout<<"I'm "<<id<<" and I'm taking a COFFEE BREAK"<<std::endl;
         this->stopRobot();
     }
     else{
         /*move the robot to the next cell*/
         this->resumeRobot();
         if(!path.empty()){
-            this->move(path.top());
+            this->move(path.front());
         }
     }
 }
 
 void Robot::reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>> recordedPath, std::shared_ptr<Cell> cell){
 
+    this->path.clear();
     auto it = recordedPath.find(cell);
     while(it != recordedPath.end()){
-        path.push(cell);
+        path.push_back(cell);
         cell = it->second;
 
         it = recordedPath.find(cell);
     }
 
+    std::reverse(path.begin(), path.end());
 }
 
 void Robot::generatePath() {
@@ -42,69 +43,65 @@ void Robot::generatePath() {
 
     std::cout << "Generating path" << std::endl;
 
-    Vector2 start = {posX, posY};
     std::shared_ptr<Cell> tmp = currentCell;
     std::unordered_map<std::shared_ptr<Cell>, int> gScore;
     std::unordered_map<std::shared_ptr<Cell>, int> fScore;
-
     std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>> recordedPath;
-    
+
+    // Usar unordered_set para evitar duplicados
+    std::unordered_set<std::shared_ptr<Cell>> openSet;
     auto compareFScore = [&](const std::shared_ptr<Cell>& a, const std::shared_ptr<Cell>& b) {
         return fScore[a] < fScore[b];
     };
 
-    std::multiset<std::shared_ptr<Cell>, decltype(compareFScore)> openSet(compareFScore);
-    
+    auto getLowestFScore = [&](const std::unordered_set<std::shared_ptr<Cell>>& set) {
+        return *std::min_element(set.begin(), set.end(), compareFScore);
+    };
+
     openSet.insert(currentCell);
 
-    std::vector<std::shared_ptr<Cell>> cells = environment->getCells();
-    
-    for (auto c : cells) {
-        gScore[c] = 9999999;
-        fScore[c] = 9999999;
-    }
-
-    gScore[tmp] = 0;
-    fScore[tmp] = environment->cellDistance(*tmp, *goal);
+    // Inicializar gScore y fScore solo para la celda actual
+    gScore[currentCell] = 0;
+    fScore[currentCell] = environment->cellDistance(*currentCell, *goal);
 
     while (!openSet.empty()) {
-        tmp = *openSet.begin();
+        tmp = getLowestFScore(openSet);
         if (tmp == goal) {
             std::cout << "Reached the goal at " << tmp->getID() << " reconstructing path!!" << std::endl;
             reconstructPath(recordedPath, tmp);
             return;
         }
 
-        openSet.erase(openSet.begin());
+        openSet.erase(tmp);
 
         std::vector<std::shared_ptr<Cell>> tmpNeighbors = tmp->getNeighbors();
-
         for (auto& n : tmpNeighbors) {
-            int tentGScore = gScore[tmp] + environment->cellDistance(*tmp, *n);
-            if (tentGScore < gScore[n]) {
+            int tentativeGScore = gScore[tmp] + environment->cellDistance(*tmp, *n);
+
+            if (gScore.find(n) == gScore.end() || tentativeGScore < gScore[n]) {
                 recordedPath[n] = tmp;
-                gScore[n] = tentGScore;
-                fScore[n] = tentGScore + environment->cellDistance(*n, *goal);
-                openSet.insert(n);
+                gScore[n] = tentativeGScore;
+                fScore[n] = tentativeGScore + environment->cellDistance(*n, *goal);
+
+                if (openSet.find(n) == openSet.end()) {
+                    openSet.insert(n);
+                }
             }
         }
     }
 }
 
-
 void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the robot*/
 
     if (currentCell == goal) {
         std::cout << "Robot reached the goal!" << std::endl;
-        path = std::stack<std::shared_ptr<Cell>>(); // Vacía el path
+        path.clear(); // Vacía el path
         return;
     }
 
     if(newPos==nullptr){
         return;
     }
-
-    std::cout<<"Moving robot to "<<newPos->getID()<<std::endl;
 
     std::array<int, 2> eDims = environment->getDims();
 
@@ -116,7 +113,7 @@ void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the rob
         posY = newPos->getPos()[1];        
 
         if(!path.empty()){
-            path.pop();
+            path.erase(path.begin());
         }
     }    
 }
@@ -186,7 +183,7 @@ void Robot::anyoneThere(){
 
 /*return next step of the robot*/
 std::shared_ptr<Cell> Robot::step(){
-    return path.top();
+    return path.front();
 }
 
 std::vector<std::shared_ptr<Cell>> Robot::getArea(){
@@ -230,6 +227,13 @@ int Robot::getID(){
 std::shared_ptr<Cell> Robot::getCurrentCell(){return this->currentCell;}
 
 std::shared_ptr<Cell> Robot::getGoal(){return this->goal;}
+
+void Robot::setPos(std::shared_ptr<Cell> pos){
+    std::array<int, 2> cellPos = pos->getPos();
+    this->currentCell = pos;
+    posX = cellPos[0];
+    posY = cellPos[1];
+}
 
 std::array<int, 2> Robot::getPos(){
     std::array<int,2> p{static_cast<int>(posX), static_cast<int>(posY)};

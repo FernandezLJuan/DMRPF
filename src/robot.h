@@ -13,7 +13,7 @@ public:
 
     Robot(int x, int y,Env* env): id(assignID()), posX(x), posY(y), environment(env){
         currentCell = environment->getCellByPos(posX, posY);
-        path.push(currentCell);
+        path.push_back(currentCell);
         this->updateDetectionArea();
     }
 
@@ -36,6 +36,7 @@ public:
     std::shared_ptr<Cell> getCurrentCell();
     std::vector<std::shared_ptr<Cell>> getArea(); /*retyurn detection area, used for drawing*/
     std::shared_ptr<Cell> getGoal();
+    void setPos(std::shared_ptr<Cell>);
     void logPos();
     void setGoal(Vector2);/*set goal at x,y position*/
     void removeGoal();
@@ -65,7 +66,7 @@ private:
     Env* environment; /*environment the robot is on*/
 
     std::shared_ptr<Cell> currentCell; /*in which cell is the robot currently?*/
-    std::stack<std::shared_ptr<Cell>> path; /*path the robot follows when moving*/
+    std::vector<std::shared_ptr<Cell>> path; /*path the robot follows when moving*/
     std::vector<std::shared_ptr<Cell>> detectionArea; /*cells in which the robot can detect robots*/
     std::vector<Robot*> neighborsRequestingNode; /*robots requesting the current node*/
 };
