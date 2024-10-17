@@ -15,6 +15,8 @@ void Env::createGrid(){
             }
         }
     }
+
+    this->randomizeRobots();
     this->connectCells();
 }
 
@@ -103,10 +105,10 @@ void Env::addObstacle(int id){
     cells[id]->setType(cellType::CELL_OBSTACLE);
     for(int i = 0; i<this->cols*this->rows;i++){
         removeEdge(id, i);
-        //cells[i]->updateNeighbors(adjMatrix, *this);
+        cells[i]->updateNeighbors(adjMatrix, *this);
     }
 
-    //cells[id]->updateNeighbors(adjMatrix, *this);
+    cells[id]->updateNeighbors(adjMatrix, *this);
 
 }
 
@@ -149,22 +151,9 @@ void Env::removeObstacle(int id){
     cells[id]->updateNeighbors(adjMatrix, *this);
 }
 
-void Env::addGoal(int id){
-    /*if the cell was an obstacle, remove it from the environment to redo connections*/
-    if(cells[id]->isObstacle()){
-        removeObstacle(id);
-    }
-
-    cells[id]->setType(cellType::CELL_GOAL);
-}
-
-void Env::removeGoal(int id){
-    cells[id]->setType(cellType::CELL_FREE);
-}
 
 int Env::placeRobot(Robot* r){
     std::array<int, 2> robotPos = r->getPos();
-    std::cout<<"trying to place robot at: "<<robotPos[0]<<","<<robotPos[1]<<std::endl;
     int posID = robotPos[0] * cols + robotPos[1]; /*id of cell at robot position*/
 
     if(((robotPos[0]<0 || robotPos[0]>cols) || (robotPos[1]<0 || robotPos[1]>rows))){
@@ -176,8 +165,6 @@ int Env::placeRobot(Robot* r){
     }
 
     cells[posID]->setObjID(r);
-    robots.push_back(r); /*add the robot to the environment*/
-    std::cout<<"placed robot at position"<<std::endl;
     return 0;
 }
 
@@ -206,6 +193,50 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
     }
     else{
         return -1;
+    }
+}
+
+void Env::remakePaths(){
+    for(auto& r : robots){
+        r->generatePath();
+    }
+}
+
+void Env::addGoal(int id){
+    /*if the cell was an obstacle, remove it from the environment to redo connections*/
+    if(cells[id]->isObstacle()){
+        removeObstacle(id);
+    }
+
+    cells[id]->setType(cellType::CELL_GOAL);
+}
+
+void Env::removeGoal(int id){
+    cells[id]->setType(cellType::CELL_FREE);
+}
+
+void Env::randomizeRobots(){
+    
+    std::shared_ptr<Cell> randomCell;
+    std::array<int, 2> rPos = {0,0};
+    Vector2 rGoal;
+
+    srand(time(NULL));
+
+    /*create a random number of n robots and assign random positions*/
+    for(int i = 0; i<nRobots; i++){
+        randomCell = cells[rand()%cells.size()];
+        rPos = randomCell->getPos();
+
+        robots.emplace_back(std::make_shared<Robot>(rPos[0],rPos[1], this));
+
+        randomCell = cells[rand()%cells.size()];
+        rPos = randomCell->getPos();
+        rGoal = {static_cast<float>(rPos[0]), static_cast<float>(rPos[1])};
+        this->placeRobot(robots[i].get());
+
+        std::cout<<robots[i]->getID()<<std::endl;
+        robots[i]->setGoal(rGoal);
     }
 }
 
@@ -243,7 +274,6 @@ void Env::onClick(int id){
         }
     }
 }
-
 void Env::pauseSim(){
     running = false;
 }
@@ -286,7 +316,7 @@ int Env::cellDistance(Cell& cell1, Cell& cell2){
 }
 
 std::vector<std::shared_ptr<Cell>> Env::getCells(){return cells;}
-std::vector<Robot*> Env::getRobots(){return robots;}
+std::vector<std::shared_ptr<Robot>> Env::getRobots(){return robots;}
 
 void Env::logAdj(){
     for(auto v : adjMatrix){
@@ -307,7 +337,7 @@ void GridRenderer::draw(Env& env) {
     int cellHeight = cDims[1];
 
     const std::vector<std::shared_ptr<Cell>>& cells = env.getCells();
-    const std::vector<Robot*>& robots = env.getRobots();
+    const std::vector<std::shared_ptr<Robot>>& robots = env.getRobots();
 
     std::unordered_set<std::shared_ptr<Cell>> detectionCells;
     int offsetY = 0;
@@ -315,7 +345,7 @@ void GridRenderer::draw(Env& env) {
 
     Color rColor = BLACK;
 
-    for (Robot* robot : robots) {
+    for (auto& robot : robots) {
 
         rColor = colorFromID(robot->getID());
 

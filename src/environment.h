@@ -20,9 +20,9 @@ class Env{
 
 public:
 
-    Env(int cellW, int cellH, int posX, int posY, int r, int c)
+    Env(int cellW, int cellH, int posX, int posY, int r, int c, int n_robots)
     : cellWidth(cellW), cellHeight(cellH), rows(r), cols(c),
-      originX(posX), originY(posY), obstacleDist(0, 1)
+      originX(posX), originY(posY), nRobots(n_robots),obstacleDist(0, 1)
 
         {
             envWidth = cellW * cols;
@@ -43,14 +43,18 @@ public:
 
     /*ENVIRONMENT MODIFICATION*/
     void updateEnvironment(); /*updates robot positions, cell neighbors and spawns random obstacles*/
-    int placeRobot(Robot*); /*place robot in the environment*/
-    int moveRobot(Robot* , std::shared_ptr<Cell>); /*update robot position*/
     void addObstacle(int);
     void removeObstacle(int);
-    void addGoal(int);
-    void removeGoal(int);
     void addEdge(int, int, int); /*add connection between two cells in the graph*/
     void removeEdge(int, int); /*remove connection between two cells in the graph*/
+
+    /*ROBOT MANAGEMENT FUNCTIONS*/
+    int placeRobot(Robot*); /*place robot in the environment*/
+    int moveRobot(Robot* , std::shared_ptr<Cell>); /*update robot position*/
+    void remakePaths();
+    void addGoal(int);
+    void removeGoal(int);
+    void randomizeRobots(); /*place robots and goals in random free cells*/
 
     /*GETTERS*/
     std::array<int, 2> getDims();
@@ -59,7 +63,7 @@ public:
     std::shared_ptr<Cell> getCellByPos(int , int );
     std::shared_ptr<Cell> getCellByID(int );
     std::vector<std::shared_ptr<Cell>> getCells();
-    std::vector<Robot*> getRobots();
+    std::vector<std::shared_ptr<Robot>> getRobots();
 
     /*other environment info*/
     bool isConnected(Cell&, Cell&); /*are the two cells connected?*/
@@ -81,13 +85,14 @@ private:
 
     const int originX, originY;
     bool running = false;
+    const int nRobots;
 
     MyRNG rng;
     std::uniform_real_distribution<float> obstacleDist; /*distribution of obstacle probability*/
     std::uniform_int_distribution<> cellDist = std::uniform_int_distribution<>(0,this->rows*this->cols); /*distribution for random cell obstacles*/
 
     std::vector<std::shared_ptr<Cell>> cells; /*each cell on the environment*/
-    std::vector<Robot*> robots; /*each robot on the environment*/
+    std::vector<std::shared_ptr<Robot>> robots; /*each robot on the environment*/
     Robot* selectedRobot = nullptr;
 
 };
