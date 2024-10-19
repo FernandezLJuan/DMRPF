@@ -9,13 +9,16 @@ void Robot::takeAction(){
     std::uniform_real_distribution<> dis(0.0, 1.0);
 
     double willIStop = dis(gen);
+    this->fetchNeighborInfo(); /*get info about neighbors and solve conflicts*/
 
     if(willIStop<waitProbability){
         this->stopRobot();
     }
     else{
         /*move the robot to the next cell*/
-        this->resumeRobot();
+        if(!moving)
+            this->resumeRobot();
+
         if(!path.empty()){
             this->move(path.front());
         }
@@ -24,7 +27,6 @@ void Robot::takeAction(){
 
 void Robot::reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>> recordedPath, std::shared_ptr<Cell> cell){
 
-    this->path.clear();
     auto it = recordedPath.find(cell);
     while(it != recordedPath.end()){
         path.push_back(cell);
@@ -37,11 +39,14 @@ void Robot::reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::share
 }
 
 void Robot::generatePath() {
+
+    this->path.clear();
+
     if (goal == nullptr) {
         return;
     }
 
-    std::cout << "Generating path" << std::endl;
+    std::cout <<this->id<<" Generating path" << std::endl;
 
     std::shared_ptr<Cell> tmp = currentCell;
     std::unordered_map<std::shared_ptr<Cell>, int> gScore;
@@ -160,22 +165,28 @@ void Robot::updateDetectionArea() {
     }
 }
 
-void Robot::anyoneThere(){
+void Robot::fetchNeighborInfo(){
     /*check for robots in the detection range of the robot*/
 
+    std::shared_ptr<Cell> rStep; /*immediate next node of neighbor robot*/
+    std::vector<std::shared_ptr<Cell>> remainingNodes; /*remaining nodes of neighbor robot rn*/
+    int rFollowers = 0; /*number of followers of neighbor robot*/
+
     for(auto& cell:detectionArea){
-        Robot* john;
-        if((john = cell->getObjID())!=nullptr){
-            /*if the robot's next cell is our current cell, one follower*/
-            if(john->step()==currentCell){
-                neighborsRequestingNode.push_back(john);
-                numberFollowers++;
-            }else{
-                /*if we had followers and the robot's next cell is not our cell, decrease followers*/
-                if(john->step() != currentCell && numberFollowers>0){
-                    numberFollowers--;
-                    neighborsRequestingNode.pop_back();
-                }
+        Robot* rn;
+        rn = cell->getObjID();
+
+        if(rn){
+            switch(environment->detectConflict(this, rn)){
+                case 0:
+                    std::cout<<"No conflict detectd"<<std::endl;
+                    break;
+                case 1: 
+                    std::cout<<"OPPOSITE CONFLICT"<<std::endl;
+                    break;
+                case 2:
+                    std::cout<<"INTERSECTION CONFLICT"<<std::endl;
+                    break;
             }
         }
     }
@@ -184,6 +195,10 @@ void Robot::anyoneThere(){
 /*return next step of the robot*/
 std::shared_ptr<Cell> Robot::step(){
     return path.front();
+}
+
+std::vector<std::shared_ptr<Cell>> Robot::getPath(){
+    return this->path;
 }
 
 std::vector<std::shared_ptr<Cell>> Robot::getArea(){
@@ -200,6 +215,10 @@ void Robot::resumeRobot(){
 
 void Robot::logPos(){
     std::cout<<"("<<this->posX<<","<<this->posY<<")"<<std::endl;
+}
+
+bool Robot::atGoal(){
+    return currentCell == goal;
 }
 
 void Robot::setGoal(Vector2 goalPos){
@@ -222,6 +241,10 @@ bool Robot::isMoving(){
 
 int Robot::getID(){
     return id;
+}
+
+int Robot::getNFollowers(){
+    return numberFollowers;
 }
 
 std::shared_ptr<Cell> Robot::getCurrentCell(){return this->currentCell;}

@@ -1,7 +1,6 @@
 #pragma once
 #include "environment.h"
 #include <stack>
-#include <set>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -19,6 +18,7 @@ public:
 
     void generatePath(); /*generate path between two positions*/
 
+    bool atGoal(); /*is the robot at goal?*/
     bool isMoving();
     void stopRobot();
     void resumeRobot();
@@ -28,14 +28,16 @@ public:
     void takeAction();
     std::shared_ptr<Cell> step();/*next step in path*/
 
-    void anyoneThere(); /*placeholder name, no se como llamarle*/
+    void fetchNeighborInfo(); /**/
 
     /*GETTERS AND SETTERS*/
     int getID();
+    int getNFollowers();
     std::array<int, 2> getPos(); /*get x,y position on the grid (is it redundant?)*/
     std::shared_ptr<Cell> getCurrentCell();
     std::vector<std::shared_ptr<Cell>> getArea(); /*retyurn detection area, used for drawing*/
     std::shared_ptr<Cell> getGoal();
+    std::vector<std::shared_ptr<Cell>> getPath();
     void setPos(std::shared_ptr<Cell>);
     void logPos();
     void setGoal(Vector2);/*set goal at x,y position*/
