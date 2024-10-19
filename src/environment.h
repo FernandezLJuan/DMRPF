@@ -9,6 +9,7 @@
 #include <random>
 #include <vector>
 #include <raylib.h>
+#include <set>
 #include <algorithm>
 #include "cell.h"
 
@@ -51,6 +52,7 @@ public:
     /*ROBOT MANAGEMENT FUNCTIONS*/
     int placeRobot(Robot*); /*place robot in the environment*/
     int moveRobot(Robot* , std::shared_ptr<Cell>); /*update robot position*/
+    int detectConflict(Robot*, Robot*); /*return the type of conflict it has detected*/
     void remakePaths();
     void addGoal(int);
     void removeGoal(int);
@@ -66,6 +68,7 @@ public:
     std::vector<std::shared_ptr<Robot>> getRobots();
 
     /*other environment info*/
+    bool isRunning();
     bool isConnected(Cell&, Cell&); /*are the two cells connected?*/
     int connectionCost(Cell&, Cell&); /*get the cost of the edge between to cells*/
     void logAdj(); /*show the adjacency matrix on screen, for debug purposes*/
@@ -82,6 +85,7 @@ private:
     const float cellWidth, cellHeight;
     const int rows, cols;
     const float obstacleProbability = 0.2f; /*probability of a cell being an obstacle*/
+    const float transientProbability = 0.3f;
 
     const int originX, originY;
     bool running = false;
@@ -94,6 +98,9 @@ private:
     std::vector<std::shared_ptr<Cell>> cells; /*each cell on the environment*/
     std::vector<std::shared_ptr<Robot>> robots; /*each robot on the environment*/
     Robot* selectedRobot = nullptr;
+
+    std::set<std::pair<Robot*, Robot*>> checkedConflicts; 
+    /*pairs of robots for which conflicts have been checked, this way we don't check the same robots over and over*/
 
 };
 
@@ -115,7 +122,7 @@ public:
 
     }
 
-    void draw(Env&);
+    void draw(Env&, float t);
 
 private:
 
