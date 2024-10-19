@@ -5,8 +5,9 @@
 
 //TODO: ADD KEYBIND TO PLACE ROBOT AT POSITION
 
+float totalTime = 0.0f;
 float timeElapsed = 0.0f;
-const float timeStep = 0.1f;
+float timeStep = 0.1f;
 
 void loadSettings(std::string path){
 /*load settings from file configuration at path*/
@@ -77,7 +78,7 @@ int main(int argc, char* argv[]){
 
     std::shared_ptr<Env> grid = std::make_shared<Env>(e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols, e_robs); /*initializes the environment*/
 
-    GridRenderer renderer(800,800,8,8);
+    GridRenderer renderer(w_width,w_height,e_rows, e_cols);
 
     SetTraceLogLevel(LOG_NONE);
     InitWindow(w_width, w_height, w_title.c_str());
@@ -90,19 +91,25 @@ int main(int argc, char* argv[]){
         if(!IsWindowMinimized()){
 
             float deltaTime = GetFrameTime();
-            timeElapsed += deltaTime;
+
+            if(grid->isRunning()){
+                timeElapsed += deltaTime;
+                totalTime += deltaTime;
+            }
+            
 
             Vector2 mousePos = GetMousePosition();
             mouseID = posToID(*grid,mousePos);
 
+            grid->onClick(mouseID);
             if(timeElapsed>=timeStep){
-                grid->onClick(mouseID);
                 grid->updateEnvironment();
                 timeElapsed = 0.0;
             }
 
             BeginDrawing();
             ClearBackground(WHITE);
+            renderer.draw(*grid, totalTime);
 
             if(IsKeyDown(KEY_ENTER)){
                 grid->resumeSim();
@@ -113,8 +120,13 @@ int main(int argc, char* argv[]){
             if(IsKeyPressed(KEY_R)){
                 grid->remakePaths();
             }
+            if(IsKeyDown(KEY_UP)){
+                timeStep -=0.01f;
+            }
+            if(IsKeyDown(KEY_DOWN)){
+                timeStep += 0.01f;
+            }
 
-            renderer.draw(*grid);
             EndDrawing();
 
             usleep(10000);
