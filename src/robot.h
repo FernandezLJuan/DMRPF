@@ -7,11 +7,12 @@
 class Env;
 class Cell;
 
-class Robot{
+class Robot
+{
 public:
-
     Robot(int x, int y,Env* env): id(assignID()), posX(x), posY(y), environment(env){
         currentCell = environment->getCellByPos(posX, posY);
+        lastCell = currentCell;
         path.push_back(currentCell);
         this->updateDetectionArea();
     }
@@ -23,6 +24,7 @@ public:
     void stopRobot();
     void resumeRobot();
     void reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>>, std::shared_ptr<Cell>);
+    void findLeader();
 
     void updateDetectionArea();
     void takeAction();
@@ -42,6 +44,8 @@ public:
     void logPos();
     void setGoal(Vector2);/*set goal at x,y position*/
     void removeGoal();
+    void setLeader(Robot*);
+    void setFollower(Robot*);
 
 private:
 
@@ -55,6 +59,7 @@ private:
     float posX, posY; /*do I really need these anymore?*/
 
     bool moving = true; /*in case robot needs to be stopped before arriving at goal*/
+    
 
     void move(std::shared_ptr<Cell>); /*move to a new position, only one cell at a time*/
     void followPath(); /*follow generated path*/
@@ -68,7 +73,11 @@ private:
     Env* environment; /*environment the robot is on*/
 
     std::shared_ptr<Cell> currentCell; /*in which cell is the robot currently?*/
+    std::shared_ptr<Cell> lastCell; /*last cell the robot has been in*/
     std::vector<std::shared_ptr<Cell>> path; /*path the robot follows when moving*/
     std::vector<std::shared_ptr<Cell>> detectionArea; /*cells in which the robot can detect robots*/
     std::vector<Robot*> neighborsRequestingNode; /*robots requesting the current node*/
+
+    Robot* leader; /*pointer to leader of the chain*/
+    Robot* follower = nullptr; /*pointer to the nearest follower*/
 };
