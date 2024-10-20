@@ -10,6 +10,7 @@ void Robot::takeAction(){
 
     double willIStop = dis(gen);
     this->fetchNeighborInfo(); /*get info about neighbors and solve conflicts*/
+    this->findLeader();
 
     if(willIStop<waitProbability){
         this->stopRobot();
@@ -72,7 +73,7 @@ void Robot::generatePath() {
     while (!openSet.empty()) {
         tmp = getLowestFScore(openSet);
         if (tmp == goal) {
-            std::cout << "Reached the goal at " << tmp->getID() << " reconstructing path!!" << std::endl;
+            std::cout << "Found path to the goal at " << tmp->getID() << " reconstructing path!!" << std::endl;
             reconstructPath(recordedPath, tmp);
             return;
         }
@@ -118,6 +119,7 @@ void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the rob
         posY = newPos->getPos()[1];        
 
         if(!path.empty()){
+            lastCell = *path.begin();
             path.erase(path.begin());
         }
     }    
@@ -176,7 +178,7 @@ void Robot::fetchNeighborInfo(){
         Robot* rn;
         rn = cell->getObjID();
 
-        if(rn){
+        /* if(rn){
             switch(environment->detectConflict(this, rn)){
                 case 0:
                     std::cout<<"No conflict detectd"<<std::endl;
@@ -187,6 +189,36 @@ void Robot::fetchNeighborInfo(){
                 case 2:
                     std::cout<<"INTERSECTION CONFLICT"<<std::endl;
                     break;
+            }
+        } */
+    }
+}
+
+void Robot::findLeader(){
+    std::shared_ptr<Cell> nextCell = this->step();
+
+    if(nextCell){
+        Robot* rn = nextCell->getObjID();
+        if(rn){
+            if(rn->step() != currentCell && !rn->atGoal()){/*si el robot que hay en la siguiente celda no se quiere mover a la mia */
+                this->leader = rn;
+                std::cout<<"Im robot: "<<this->id<< " and my leader is "<<leader->getID()<<std::endl;
+            }
+        }
+    }
+
+    Robot* rn = lastCell->getObjID();
+    if(rn){
+        if(rn->step() == currentCell){
+            this->follower = rn;
+            this->numberFollowers++;
+        }
+        else{
+            if(follower){
+                if(rn->getID() == follower->getID()){
+                    this->follower = nullptr;
+                    this->numberFollowers--;
+                }
             }
         }
     }
