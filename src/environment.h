@@ -84,7 +84,7 @@ private:
     int envWidth, envHeight;
     const float cellWidth, cellHeight;
     const int rows, cols;
-    const float obstacleProbability = 0.2f; /*probability of a cell being an obstacle*/
+    const float obstacleProbability = 0.0f; /*probability of a cell being an obstacle*/
     const float transientProbability = 0.3f;
 
     const int originX, originY;
