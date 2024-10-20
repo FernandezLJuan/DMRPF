@@ -81,6 +81,7 @@ int main(int argc, char* argv[]){
     GridRenderer renderer(w_width,w_height,e_rows, e_cols);
 
     SetTraceLogLevel(LOG_NONE);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(w_width, w_height, w_title.c_str());
     SetTargetFPS(60);
     EnableEventWaiting();
