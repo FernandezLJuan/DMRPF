@@ -259,10 +259,6 @@ void Env::randomizeRobots(){
         robots.emplace_back(std::make_shared<Robot>(rPos[0],rPos[1], this));
         randomCell = cells[rand()%cells.size()];
 
-        if(randomCell->getObjID()){
-            continue;
-        }
-
         rPos = randomCell->getPos();
         rGoal = {static_cast<float>(rPos[0]), static_cast<float>(rPos[1])};
 
