@@ -44,8 +44,10 @@ int main(int argc, char* argv[]){
 
     /*settings for window and environment*/
     int e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols, e_robs;
+    float e_obsProb;
     int w_width, w_height;
     std::string w_title;
+    std::string e_map;
 
     libconfig::Config cfg;
     cfg.readFile(configFile.c_str());
@@ -66,6 +68,8 @@ int main(int argc, char* argv[]){
     const libconfig::Setting& origin = environment["origin"];
     
     environment.lookupValue("n_robots", e_robs);
+    environment.lookupValue("obsProb", e_obsProb);
+    environment.lookupValue("map", e_map);
     
     cellDims.lookupValue("w", e_cellW);
     cellDims.lookupValue("h", e_cellH);
@@ -76,7 +80,11 @@ int main(int argc, char* argv[]){
     origin.lookupValue("x", e_posX);
     origin.lookupValue("y", e_posY);
 
-    std::shared_ptr<Env> grid = std::make_shared<Env>(e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols, e_robs); /*initializes the environment*/
+    std::shared_ptr<Env> grid = std::make_shared<Env>(e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols, e_robs, e_obsProb); /*initializes the environment*/
+
+    if(grid->load_map(e_map)<0){
+        grid->randomGrid(); /*if the map file was invalid, randomize everything*/
+    }
 
     GridRenderer renderer(w_width,w_height,e_rows, e_cols);
 
@@ -117,9 +125,6 @@ int main(int argc, char* argv[]){
             }
             if(IsKeyDown(KEY_SPACE)){
                 grid->pauseSim();
-            }
-            if(IsKeyPressed(KEY_R)){
-                grid->remakePaths();
             }
             if(IsKeyDown(KEY_UP)){
                 timeStep -=0.01f;
