@@ -113,10 +113,7 @@ void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the rob
 
     if(!(environment->moveRobot(this, newPos)<0) && this->moving){
         currentCell = environment->getCellByID(newPos->getID());
-        updateDetectionArea(); /*update detection area after moving*/
-
-        posX = newPos->getPos()[0];
-        posY = newPos->getPos()[1];        
+        updateDetectionArea(); /*update detection area after moving*/      
 
         if(!path.empty()){
             lastCell = *path.begin();
@@ -178,7 +175,7 @@ void Robot::fetchNeighborInfo(){
         Robot* rn;
         rn = cell->getObjID();
 
-        /* if(rn){
+        if(rn){
             switch(environment->detectConflict(this, rn)){
                 case 0:
                     std::cout<<"No conflict detectd"<<std::endl;
@@ -190,7 +187,7 @@ void Robot::fetchNeighborInfo(){
                     std::cout<<"INTERSECTION CONFLICT"<<std::endl;
                     break;
             }
-        } */
+        }
     }
 }
 
@@ -245,18 +242,14 @@ void Robot::resumeRobot(){
     this->moving = true;
 }
 
-void Robot::logPos(){
-    std::cout<<"("<<this->posX<<","<<this->posY<<")"<<std::endl;
-}
-
 bool Robot::atGoal(){
     return currentCell == goal;
 }
 
-void Robot::setGoal(Vector2 goalPos){
-    goal = environment->getCellByPos(goalPos.x, goalPos.y);
-    if(goal != currentCell){
-        environment->addGoal(goal->getID());
+void Robot::setGoal(std::shared_ptr<Cell> goalPos){
+    goal = goalPos;
+    if(goalPos != currentCell){
+        environment->addGoal(goalPos->getID());
     }
     this->generatePath();
 }
@@ -282,15 +275,3 @@ int Robot::getNFollowers(){
 std::shared_ptr<Cell> Robot::getCurrentCell(){return this->currentCell;}
 
 std::shared_ptr<Cell> Robot::getGoal(){return this->goal;}
-
-void Robot::setPos(std::shared_ptr<Cell> pos){
-    std::array<int, 2> cellPos = pos->getPos();
-    this->currentCell = pos;
-    posX = cellPos[0];
-    posY = cellPos[1];
-}
-
-std::array<int, 2> Robot::getPos(){
-    std::array<int,2> p{static_cast<int>(posX), static_cast<int>(posY)};
-    return p;
-}

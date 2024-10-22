@@ -10,8 +10,7 @@ class Cell;
 class Robot
 {
 public:
-    Robot(int x, int y,Env* env): id(assignID()), posX(x), posY(y), environment(env){
-        currentCell = environment->getCellByPos(posX, posY);
+    Robot(std::shared_ptr<Cell> cell,Env* env): id(assignID()), environment(env), currentCell(cell){
         lastCell = currentCell;
         path.push_back(currentCell);
         this->updateDetectionArea();
@@ -42,7 +41,7 @@ public:
     std::vector<std::shared_ptr<Cell>> getPath();
     void setPos(std::shared_ptr<Cell>);
     void logPos();
-    void setGoal(Vector2);/*set goal at x,y position*/
+    void setGoal(std::shared_ptr<Cell>);/*set goal at x,y position*/
     void removeGoal();
     void setLeader(Robot*);
     void setFollower(Robot*);
@@ -56,7 +55,6 @@ private:
 
     int id;
     int numberFollowers;
-    float posX, posY; /*do I really need these anymore?*/
 
     bool moving = true; /*in case robot needs to be stopped before arriving at goal*/
     
