@@ -11,6 +11,8 @@
 #include <raylib.h>
 #include <set>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 #include "cell.h"
 
 class Robot;
@@ -21,9 +23,9 @@ class Env{
 
 public:
 
-    Env(int cellW, int cellH, int posX, int posY, int r, int c, int n_robots)
+    Env(int cellW, int cellH, int posX, int posY, int r, int c, int n_robots, const float obsProb)
     : cellWidth(cellW), cellHeight(cellH), rows(r), cols(c),
-      originX(posX), originY(posY), nRobots(n_robots),obstacleDist(0, 1)
+      originX(posX), originY(posY), nRobots(n_robots),obstacleDist(0, 1), obstacleProbability(obsProb)
 
         {
             envWidth = cellW * cols;
@@ -33,14 +35,11 @@ public:
             adjMatrix= std::vector<std::vector<int> >(rows*cols, std::vector<int>(rows*cols, 0));
 
             cells.reserve(rows*cols);
-
-            createGrid();
         }
 
     void pauseSim();
     void resumeSim();
     void onClick(int);
-    int cellDistance(Cell&, Cell&);
 
     /*ENVIRONMENT MODIFICATION*/
     void updateEnvironment(); /*updates robot positions, cell neighbors and spawns random obstacles*/
@@ -48,6 +47,8 @@ public:
     void removeObstacle(int);
     void addEdge(int, int, int); /*add connection between two cells in the graph*/
     void removeEdge(int, int); /*remove connection between two cells in the graph*/
+    int load_map(std::string&);
+    void randomGrid(); /*fills the cell vector with rectangles*/
 
     /*ROBOT MANAGEMENT FUNCTIONS*/
     int placeRobot(Robot*); /*place robot in the environment*/
@@ -70,13 +71,14 @@ public:
     /*other environment info*/
     bool isRunning();
     bool isConnected(Cell&, Cell&); /*are the two cells connected?*/
+    int cellDistance(Cell&, Cell&);
     int connectionCost(Cell&, Cell&); /*get the cost of the edge between to cells*/
     void logAdj(); /*show the adjacency matrix on screen, for debug purposes*/
+    void dump_map();
 
 
 private:
 
-    void createGrid(); /*fills the cell vector with rectangles*/
     void connectCells();
 
     std::vector<std::vector<int>> adjMatrix; /*SHOULD ALWAYS BE UPDATED BEFORE CELL NEIGHBORS*/
@@ -84,9 +86,7 @@ private:
     int envWidth, envHeight;
     const float cellWidth, cellHeight;
     const int rows, cols;
-    const float obstacleProbability = 0.0f; /*probability of a cell being an obstacle*/
-    const float transientProbability = 0.3f;
-
+    
     const int originX, originY;
     bool running = false;
     const int nRobots;
@@ -94,7 +94,9 @@ private:
     MyRNG rng;
     std::uniform_real_distribution<float> obstacleDist; /*distribution of obstacle probability*/
     std::uniform_int_distribution<> cellDist = std::uniform_int_distribution<>(0,this->rows*this->cols); /*distribution for random cell obstacles*/
-
+    
+    const float obstacleProbability = 0.2f; /*probability of a cell being an obstacle*/
+    
     std::vector<std::shared_ptr<Cell>> cells; /*each cell on the environment*/
     std::vector<std::shared_ptr<Robot>> robots; /*each robot on the environment*/
     Robot* selectedRobot = nullptr;
