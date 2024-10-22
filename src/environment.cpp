@@ -223,6 +223,8 @@ void Env::removeEdge(int id1, int id2){
 int Env::load_map(std::string& path){
     std::ifstream mapFile(path);
 
+    std::cout<<"LOADING "<<path<<std::endl;
+
     if(!mapFile.is_open()){
         std::cout<<"File not found"<<std::endl;
         return -1;
@@ -261,6 +263,8 @@ int Env::load_map(std::string& path){
         for(int j = 0; j<cols; j++)
             cells.emplace_back(std::make_shared<Cell>(i*cols+j,i,j));
     }
+
+    this->connectCells();
 
     std::string numbers = obstacleList.substr(obstacleList.find('[') + 1, obstacleList.find(']') - obstacleList.find('[') - 1); // Extract numbers
     std::stringstream ssObs(numbers);
