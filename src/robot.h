@@ -2,7 +2,6 @@
 #include "environment.h"
 #include <stack>
 #include <unordered_set>
-#include <unordered_map>
 
 class Env;
 class Cell;
@@ -14,6 +13,10 @@ public:
         lastCell = currentCell;
         path.push_back(currentCell);
         this->updateDetectionArea();
+    }
+
+    static void resetID(){
+        currentID = 0;
     }
 
     void generatePath(); /*generate path between two positions*/
@@ -29,7 +32,7 @@ public:
     void takeAction();
     std::shared_ptr<Cell> step();/*next step in path*/
 
-    void fetchNeighborInfo(); /**/
+    void fetchNeighborInfo();
 
     /*GETTERS AND SETTERS*/
     int getID();
@@ -49,12 +52,14 @@ public:
 private:
 
     static int assignID(){
-        static int currentID = 0;
         return ++currentID;
     }
 
+    static int currentID;
+
     int id;
     int numberFollowers;
+    int lastAction = 0; /*waited = 0, moved = 1*/
 
     bool moving = true; /*in case robot needs to be stopped before arriving at goal*/
     
@@ -75,6 +80,7 @@ private:
     std::vector<std::shared_ptr<Cell>> path; /*path the robot follows when moving*/
     std::vector<std::shared_ptr<Cell>> detectionArea; /*cells in which the robot can detect robots*/
     std::vector<Robot*> neighborsRequestingNode; /*robots requesting the current node*/
+    std::vector<Robot*> neighbors; /*robots inside detection area*/
 
     Robot* leader; /*pointer to leader of the chain*/
     Robot* follower = nullptr; /*pointer to the nearest follower*/
