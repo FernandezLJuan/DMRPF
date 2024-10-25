@@ -1,5 +1,7 @@
 #include "robot.h"
 
+int Robot::currentID = 0;
+
 void Robot::takeAction(){
     /*robot will either stop for this step or follow the path to it's next node*/
 
@@ -47,14 +49,12 @@ void Robot::generatePath() {
         return;
     }
 
-    std::cout <<this->id<<" Generating path" << std::endl;
-
     std::shared_ptr<Cell> tmp = currentCell;
     std::unordered_map<std::shared_ptr<Cell>, int> gScore;
     std::unordered_map<std::shared_ptr<Cell>, int> fScore;
     std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>> recordedPath;
 
-    // Usar unordered_set para evitar duplicados
+    //use unordered set to avoid duplicates in openSet
     std::unordered_set<std::shared_ptr<Cell>> openSet;
     auto compareFScore = [&](const std::shared_ptr<Cell>& a, const std::shared_ptr<Cell>& b) {
         return fScore[a] < fScore[b];
@@ -66,14 +66,13 @@ void Robot::generatePath() {
 
     openSet.insert(currentCell);
 
-    // Inicializar gScore y fScore solo para la celda actual
+    //only initialize gscore and fscore for the current cell (start position)
     gScore[currentCell] = 0;
     fScore[currentCell] = environment->cellDistance(*currentCell, *goal);
 
     while (!openSet.empty()) {
         tmp = getLowestFScore(openSet);
         if (tmp == goal) {
-            std::cout << "Found path to the goal at " << tmp->getID() << " reconstructing path!!" << std::endl;
             reconstructPath(recordedPath, tmp);
             return;
         }
@@ -100,7 +99,6 @@ void Robot::generatePath() {
 void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the robot*/
 
     if (currentCell == goal) {
-        std::cout << "Robot reached the goal!" << std::endl;
         path.clear(); // Vacía el path
         return;
     }
@@ -125,6 +123,7 @@ void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the rob
 void Robot::updateDetectionArea() {
     /*use BFS to get the communication range of the robot*/
     detectionArea.clear();
+    neighbors.clear();
 
     std::unordered_set<std::shared_ptr<Cell>> visited{currentCell}; /*mark current cell as visited so it is not included in the range*/
     std::deque<std::pair<std::shared_ptr<Cell>, int>> toVisit; /*cells to visit and determine distance*/
@@ -141,6 +140,9 @@ void Robot::updateDetectionArea() {
         /*if there isn't a robot in the neighbor, use it as give way node*/
         if(neighbor->getObjID()!=nullptr){
             giveWayNode = neighbor;
+        }
+        else if(neighbor != currentCell){
+            neighbors.push_back(neighbor->getObjID());
         }
     }
 
@@ -160,6 +162,10 @@ void Robot::updateDetectionArea() {
                 detectionArea.push_back(n);
                 visited.insert(n);
             }
+
+            if(n->getObjID() && n!=currentCell){
+                neighbors.push_back(n->getObjID());
+            }
         }
     }
 }
@@ -169,25 +175,21 @@ void Robot::fetchNeighborInfo(){
 
     std::shared_ptr<Cell> rStep; /*immediate next node of neighbor robot*/
     std::vector<std::shared_ptr<Cell>> remainingNodes; /*remaining nodes of neighbor robot rn*/
-    int rFollowers = 0; /*number of followers of neighbor robot*/
-
-    for(auto& cell:detectionArea){
-        Robot* rn;
-        rn = cell->getObjID();
-
-        if(rn){
-            switch(environment->detectConflict(this, rn)){
-                case 0:
-                    std::cout<<"No conflict detectd"<<std::endl;
-                    break;
-                case 1: 
-                    std::cout<<"OPPOSITE CONFLICT"<<std::endl;
-                    break;
-                case 2:
-                    std::cout<<"INTERSECTION CONFLICT"<<std::endl;
-                    break;
+    
+    for(auto& n : neighbors){
+            if(n){
+                switch(environment->detectConflict(this, n)){
+                    case 0:
+                        std::cout<<"No conflict detected"<<std::endl;
+                        break;
+                    case 1:
+                        std::cout<<"OPPOSITE CONFLICT"<<std::endl;
+                        break;
+                    case 2:
+                        std::cout<<"INTERSECTION CONFLICT"<<std::endl;
+                        break;
+                }
             }
-        }
     }
 }
 
@@ -199,7 +201,6 @@ void Robot::findLeader(){
         if(rn){
             if(rn->step() != currentCell && !rn->atGoal()){/*si el robot que hay en la siguiente celda no se quiere mover a la mia */
                 this->leader = rn;
-                std::cout<<"Im robot: "<<this->id<< " and my leader is "<<leader->getID()<<std::endl;
             }
         }
     }
@@ -255,6 +256,9 @@ void Robot::setGoal(std::shared_ptr<Cell> goalPos){
 }
 
 void Robot::removeGoal(){
+    if(!goal){
+        return;
+    }
     environment->removeGoal(goal->getID());
     goal = nullptr;
     this->generatePath();
