@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <unordered_map>
 #include "cell.h"
 
 class Robot;
@@ -39,7 +40,7 @@ public:
 
     void pauseSim();
     void resumeSim();
-    void onClick(int);
+    bool onClick(int);
 
     /*ENVIRONMENT MODIFICATION*/
     void updateEnvironment(); /*updates robot positions, cell neighbors and spawns random obstacles*/
@@ -49,6 +50,8 @@ public:
     void removeEdge(int, int); /*remove connection between two cells in the graph*/
     int load_map(std::string&);
     void randomGrid(); /*fills the cell vector with rectangles*/
+    void resetEnv(int, int, bool); /*clears cells and robot vectors*/
+    void updateNeighborConnections(int, bool);
 
     /*ROBOT MANAGEMENT FUNCTIONS*/
     int placeRobot(Robot*); /*place robot in the environment*/
@@ -85,7 +88,7 @@ private:
 
     int envWidth, envHeight;
     const float cellWidth, cellHeight;
-    const int rows, cols;
+    int rows, cols;
     
     const int originX, originY;
     bool running = false;
@@ -99,6 +102,7 @@ private:
     
     std::vector<std::shared_ptr<Cell>> cells; /*each cell on the environment*/
     std::vector<std::shared_ptr<Robot>> robots; /*each robot on the environment*/
+    std::set<std::shared_ptr<Robot>> robotsAtGoal; /*each robot on the environment*/
     Robot* selectedRobot = nullptr;
 
     std::set<std::pair<Robot*, Robot*>> checkedConflicts; 
@@ -110,7 +114,7 @@ class GridRenderer{
 
 public:
 
-    GridRenderer(int width, int height, int rows, int cols) : envWidth(width), envHeight(height), rows(rows), cols(cols){}
+    GridRenderer(int width, int height, int rows, int cols) : cellW(width), cellH(height), rows(rows), cols(cols){}
 
     Color colorFromID(int id){
         /*encode color using robot (or cell) IDs*/
@@ -124,11 +128,23 @@ public:
 
     }
 
+    void cacheRobotColors(int nRobots){
+        if(nRobots == 0){
+            nRobots = 10;
+        }
+
+        for(int i = 0; i<nRobots;i++){
+            robotColors[i] = colorFromID(i);
+        }
+    }
+
     void draw(Env&, float t);
 
 private:
 
-    int envWidth, envHeight;
+    int cellW, cellH;
     int rows, cols;
+
+    std::unordered_map<int,Color> robotColors;
 
 };

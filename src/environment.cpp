@@ -3,50 +3,32 @@
 
 /*PRIVATE FUNCTIONS*/
 void Env::randomGrid(){
-    float isObstacle = 1.0f;
-
-    for(int i = 0; i < this->rows; i++){
-        for(int j = 0; j < this->cols; j++){
-            int currentIdx = i * this->cols + j;
-
-            cells.emplace_back(std::make_shared<Cell>(currentIdx, i, j)); /*avoids creating unnecesary copy of Cell*/
-            isObstacle = obstacleDist(rng);
-            if(isObstacle < this->obstacleProbability){
-                cells.back()->setType(cellType::CELL_OBSTACLE);
-            }
-        }
-    }
-
-    this->connectCells();
+    this->resetEnv(rows, cols,true);
     this->randomizeRobots();
+    std::cout<<"Randomized robots"<<std::endl;
 }
 
-void Env::connectCells(){
-    /*directions of cells to be added*/
+void Env::connectCells() {
     std::vector<std::pair<int, int>> directions = {
-        {0,-1},{0,1},{-1,0},{1,0},
-        {-1,-1},{-1,1},{1,-1},{1,1}
+        {0, -1}, {0, 1}, {-1, 0}, {1, 0},
+        {-1, -1}, {-1, 1}, {1, -1}, {1, 1}
     };
 
-    /*add edges to the graph*/
-    for(int i = 0; i<this->rows; i++){
-        for(int j = 0; j<this->cols; j++){
+    for (int i = 0; i < this->rows; i++) {
+        for (int j = 0; j < this->cols; j++) {
+            int currentIdx = i * this->cols + j;
 
-            int currentIdx = i * this->cols+j;
-
-            /*add neighbor on each direction*/
-            for(auto &dir : directions){
+            for (auto &dir : directions) {
                 int ni = i + dir.first;
                 int nj = j + dir.second;
 
-                int connectionCost = (abs(dir.first) == abs(dir.second)) ? 2 : 1; /*cost of two if cells are diagonal, 1 if not*/
-
-                if(ni>=0 && ni<this->rows && nj>=0 && nj<this->cols){
-                    int neighborIdx = ni * this->cols+nj;
-                    addEdge(currentIdx, neighborIdx, connectionCost);
+                if (ni >= 0 && ni < this->rows && nj >= 0 && nj < this->cols) {
+                    int neighborIdx = ni * this->cols + nj;
+                    addEdge(currentIdx, neighborIdx, (abs(dir.first) == abs(dir.second)) ? 2 : 1);
                 }
             }
             cells[currentIdx]->updateNeighbors(adjMatrix, *this);
+
         }
     }
 }
@@ -60,16 +42,50 @@ void Env::resumeSim(){
     running = true;
 }
 
-void Env::onClick(int id){
+bool Env::onClick(int id){
+
+    bool success = true;
 
     if(IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)){
         if(IsKeyDown(KEY_S)){
             this->dump_map();
         }
+        else if(IsKeyDown(KEY_O)){
+            std::string path;
+            std::cout<<"Provide the path to the map you want to read: ";
+            std::cin>>path;
+            this->load_map(path);
+        }
+        else if(IsKeyDown(KEY_LEFT_SHIFT)){
+            if(IsKeyDown(KEY_R))
+                this->resetEnv(rows,cols, false);
+        }
+        else if(IsKeyDown(KEY_R)){
+            this->randomGrid();
+        }
+    }
+
+    if(IsKeyPressed(KEY_R)){
+        remakePaths();
+    }
+
+    if(IsKeyPressed(KEY_SPACE)){
+        if(isRunning()){
+            pauseSim();
+        }
+        else{
+            resumeSim();
+        }
+    }
+
+    if(IsKeyPressed(KEY_DELETE)){
+        if(selectedRobot){
+            selectedRobot->removeGoal();
+        }
     }
 
     if(id<0 || id>cells.size()){
-        return;
+        return false;
     }
 
     if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)){
@@ -94,12 +110,6 @@ void Env::onClick(int id){
             removeObstacle(id);
         }
     }
-
-    if(IsKeyPressed(KEY_DELETE)){
-        if(selectedRobot){
-            selectedRobot->removeGoal();
-        }
-    }
     
     if(IsKeyPressed(KEY_G)){
         std::shared_ptr<Robot> R = std::make_shared<Robot>(cells[id], this);
@@ -110,19 +120,20 @@ void Env::onClick(int id){
         selectedRobot = R.get();
     }
 
-    
+    return true;
+
 }
 
 /*ENVIRONMENT MODIFICATION*/
 void Env::updateEnvironment(){
 
-    checkedConflicts.clear();
+    /*if all robots are at goal, pause the simulation*/
+    if(robots.size() == robotsAtGoal.size() && robots.size()>0){
+        std::cout<<"All robots at goal, pausing simulation"<<std::endl;
+        running = false;
+    }
 
-    float isObstacle = 1.0f;
-    int randomID = 0;
-    isObstacle = obstacleDist(rng);
-    srand(time(NULL));
-    randomID = rand()%cells.size();
+    checkedConflicts.clear();
 
     /*if the simulation is paused don't update environment*/
     if(!running){
@@ -130,17 +141,6 @@ void Env::updateEnvironment(){
     }
 
     /*add transient obstacle*/
-    /* if(isObstacle<transientProbability){
-        addObstacle(randomID);
-    }
-    else{
-        removeObstacle(randomID);
-    } */
-
-    /*update all cell neighbors to match added and removed obstacles*/
-    for(auto& c : cells){
-        c->updateNeighbors(adjMatrix, *this);
-    }
 
     /*all robots in the environment shall take an action, be it wait or move*/
     for(auto& r : robots){
@@ -148,23 +148,19 @@ void Env::updateEnvironment(){
             r->updateDetectionArea(); /*update robot detection area after updating cell neighbors*/
             r->takeAction();
         }
+        else{
+            robotsAtGoal.insert(r);
+        }
     }
 }
 
 void Env::addObstacle(int id){
-    if(id<0 || id>=(this->cols*this->rows) || cells[id]->getObjID()!=nullptr || cells[id]->isGoal()){
+    if(id < 0 || id >= (this->cols * this->rows) || cells[id]->getObjID() != nullptr || cells[id]->isGoal()) {
         return;
     }
 
-    /*remove all neighbors of current cell and remove current cell from all neighbor list*/
     cells[id]->setType(cellType::CELL_OBSTACLE);
-    for(int i = 0; i<this->cols*this->rows;i++){
-        removeEdge(id, i);
-        cells[i]->updateNeighbors(adjMatrix, *this);
-    }
-
-    cells[id]->updateNeighbors(adjMatrix, *this);
-
+    updateNeighborConnections(id, false);
 }
 
 void Env::removeObstacle(int id){
@@ -177,33 +173,9 @@ void Env::removeObstacle(int id){
     }
 
     cells[id]->setType(cellType::CELL_FREE);
+    std::cout<<"Removed obstacle from "<<id<<std::endl;
 
-    std::vector<std::pair<int, int>> directions = {
-        {0,-1},{0,1},{-1,0},{1,0},
-        {-1,-1},{-1,1},{1,-1},{1,1}
-    };
-
-    /*get the row and col of the cell*/
-    int i = id / this->cols;
-    int j = id % this->cols;
-
-    /*add the neighbors to cell and update neighbors of surrounding cells to include it*/
-    for(auto &pair : directions){
-        int ni = i + pair.first;
-        int nj = j + pair.second;
-
-        int connectionCost = (abs(pair.first) == abs(pair.second)) ? 2 : 1;
-
-        if(ni>=0 && ni<this->rows && nj>=0 && nj<this->cols){
-            int neighborIdx = ni*this->cols + nj;
-
-            addEdge(id, neighborIdx, connectionCost);
-            cells[neighborIdx]->updateNeighbors(adjMatrix, *this);
-        }
-    }
-
-    /*update neighbor list of current cell*/
-    cells[id]->updateNeighbors(adjMatrix, *this);
+    updateNeighborConnections(id, true);
 }
 
 void Env::addEdge(int id1, int id2, int cost){
@@ -221,77 +193,149 @@ void Env::removeEdge(int id1, int id2){
 }
 
 int Env::load_map(std::string& path){
+
+    this->pauseSim();
+
     std::ifstream mapFile(path);
-
-    std::cout<<"LOADING "<<path<<std::endl;
-
     if(!mapFile.is_open()){
         std::cout<<"File not found"<<std::endl;
         return -1;
     }
 
+    std::cout<<"LOADING "<<path<<std::endl;
+
     std::string line;
-    std::string search1 = "obstacles = ";
-    std::string search2 = "robots = ";
-    std::string obstacleList;
-    std::string robotList;
-    bool obstaclesFound = false;
-    bool robotsFound = false;
+    std::string obstacleList, robotList, strDims;
+    bool obstaclesFound = false, robotsFound = false, dimsFound = false;
+
     while(std::getline(mapFile, line)){
-        if(line.rfind(search1,0) == 0){
-            obstaclesFound = true;
+        if(line.rfind("obstacles = ", 0) == 0){
             obstacleList = line;
+            obstaclesFound = true;
         }
-        if(line.rfind(search2,0) == 0){
-            robotsFound = true;
+        if(line.rfind("robots = ", 0) == 0){
             robotList = line;
+            robotsFound = true;
+        }
+        if(line.rfind("dims = ", 0) == 0){
+            strDims = line;
+            dimsFound = true;
         }
     }
 
-    if(!obstaclesFound){
-        std::cout<<"MISSING LINE \'"<<search1<<"\'"<<std::endl;
+    if(!obstaclesFound || !robotsFound){
+        std::cout<<"Missing necessary data in the map file"<<std::endl;
         return -1;
     }
 
-    if(!robotsFound){
-        std::cout<<"MISSING LINE \'"<<search2<<"\'"<<std::endl;
-        return -1;
+    if(dimsFound){
+        size_t start = strDims.find("[") + 1;
+        size_t end = strDims.find("]");
+        std::string mapDims = strDims.substr(start, end-start);
+        size_t commaPos = mapDims.find(',');
+
+        int nRows = std::stoi(mapDims.substr(0, commaPos));
+        int nCols = std::stoi(mapDims.substr(commaPos+1));
+
+        this->resetEnv(nRows, nCols, false);
+    }
+    else{
+        this->resetEnv(rows,cols,false);
     }
 
-    /*create empty map*/
-    for(int i = 0; i<rows; i++){
-        for(int j = 0; j<cols; j++)
-            cells.emplace_back(std::make_shared<Cell>(i*cols+j,i,j));
-    }
-
-    this->connectCells();
-
-    std::string numbers = obstacleList.substr(obstacleList.find('[') + 1, obstacleList.find(']') - obstacleList.find('[') - 1); // Extract numbers
+    std::vector<int> obstacleIds;
+    std::string numbers = obstacleList.substr(obstacleList.find('[') + 1, obstacleList.find(']') - obstacleList.find('[') - 1);
     std::stringstream ssObs(numbers);
-    std::string number;
-    while (std::getline(ssObs, number, ',')) {
-        this->addObstacle(std::stoi(number));
+    std::string cellID;
+
+    while (std::getline(ssObs, cellID, ',')) {
+        obstacleIds.push_back(std::stoi(cellID));
+        cells[std::stoi(cellID)]->setType(cellType::CELL_OBSTACLE);
     }
 
+    for (int id : obstacleIds) {
+        this->addObstacle(id);
+    }
 
-    std::string robotsData = robotList.substr(robotList.find('[') + 1, robotList.find(']') - robotList.find('[') - 1); // Extract robots data
+    std::string robotsData = robotList.substr(robotList.find('[') + 1, robotList.find(']') - robotList.find('[') - 1);
     std::stringstream ssRob(robotsData);
     std::string robotPair;
+
     while (std::getline(ssRob, robotPair, ',')) {
         size_t colonPos = robotPair.find(':');
         if (colonPos != std::string::npos) {
             int startID = std::stoi(robotPair.substr(0, colonPos));
             int goalID = std::stoi(robotPair.substr(colonPos + 1));
-            
-            robots.emplace_back(std::make_shared<Robot>(cells[startID],this));
 
-            this->placeRobot(robots.back().get());
-            robots.back()->setGoal(cells[goalID]);
+            std::shared_ptr<Robot> robot = std::make_shared<Robot>(cells[startID], this);
+            robots.push_back(robot);
+            this->placeRobot(robot.get());
+
+            if (goalID >= 0) {
+                robot->setGoal(cells[goalID]);
+            }
         }
     }
 
     return 0;
 }
+
+void Env::resetEnv(int nRows, int nCols, bool randomize) {
+
+    this->rows = nRows;
+    this->cols = nCols;
+
+    Robot::resetID();
+
+    robots.clear();
+    robotsAtGoal.clear();
+    adjMatrix.clear();
+    adjMatrix= std::vector<std::vector<int> >(rows*cols, std::vector<int>(rows*cols, 0));
+
+    cells.clear();
+    cells.resize(nRows * nCols);
+
+    for (int i = 0; i < nRows * nCols; ++i) {
+        cells[i] = std::make_shared<Cell>(i/nCols*nCols + i%nCols, i / nCols, i % nCols);
+        if(randomize){
+            float isObstacle = obstacleDist(rng);
+            if(isObstacle<obstacleProbability){
+                cells[i]->setType(cellType::CELL_OBSTACLE);
+            }
+        }
+    }
+    this->connectCells();
+}
+
+void Env::updateNeighborConnections(int id, bool isAdding){
+
+    std::vector<std::pair<int, int>> directions = {
+        {0, -1}, {0, 1}, {-1, 0}, {1, 0},
+        {-1, -1}, {-1, 1}, {1, -1}, {1, 1}
+    };
+
+    int row = id / this->cols;
+    int col = id % this->cols;
+
+    for (const auto &dir : directions) {
+        int newRow = row + dir.first;
+        int newCol = col + dir.second;
+
+        if (newRow >= 0 && newRow < this->rows && newCol >= 0 && newCol < this->cols) {
+            int neighborID = newRow * this->cols + newCol;
+
+            if (isAdding) {
+                addEdge(id, neighborID, (abs(dir.first) == abs(dir.second)) ? 2 : 1);
+            } else {
+                removeEdge(id, neighborID);
+            }
+            cells[neighborID]->updateNeighbors(adjMatrix, *this);
+        }
+    }
+    cells[id]->updateNeighbors(adjMatrix, *this);
+
+}
+
 
 /*ROBOT MANIPULATION FUNCTIONS*/
 int Env::placeRobot(Robot* r){
@@ -401,7 +445,6 @@ void Env::addGoal(int id){
 }
 
 void Env::removeGoal(int id){
-    std::cout<<"Removing goal from: "<<id<<std::endl;
     cells[id]->setType(cellType::CELL_FREE);
 }
 
@@ -425,28 +468,28 @@ void Env::randomizeRobots(){
         robots.emplace_back(std::make_shared<Robot>(randomCell, this));
         randomCell = cells[rand()%cells.size()];
 
-
-        std::cout<<"Goal at: "<<randomCell->getID()<<std::endl;
-        robots.back()->setGoal(randomCell);
         this->placeRobot(robots.back().get());
+        robots.back()->setGoal(randomCell);
 
         placedRobots++;
-
     }
 }
 
 /*GETTERS AND SETTERS*/
 std::array<int, 2> Env::getDims(){
+    /*returns number of rows and cols*/
     std::array<int,2> eDims{this->rows, this->cols};
     return eDims;
 }
 
 std::array<int, 2> Env::cellDims(){
+    /*returns width and height of each cell*/
     std::array<int,2> cDims{static_cast<int>(this->cellWidth), static_cast<int>(this->cellHeight)};
     return cDims;
 }
 
 std::array<int, 2> Env::origin(){
+    /*returns origin position of the environment*/
     std::array<int,2> ox{this->originX, this->originY};
     return ox;
 }
@@ -506,6 +549,7 @@ void Env::dump_map(){
 
     std::string obstacleIDs = "["; /*cell ids of obstacles*/
     std::string robotIDs = "["; /*cell ids of robots*/
+    std::string dims = "dims = [" + std::to_string(rows)+","+std::to_string(cols)+"]\n";
 
     std::cout<<"Want to save this map? (Y/n) ";
     std::cin>>response;
@@ -541,6 +585,10 @@ void Env::dump_map(){
             if(tempRobot->getGoal()){
                 robotIDs.append(":"+std::to_string(tempRobot->getGoal()->getID()));
             }
+            else{
+                std::cout<<"Robot has no goal"<<std::endl;
+                robotIDs.append(":"+std::to_string(-1));
+            }
         }
     }
 
@@ -550,6 +598,7 @@ void Env::dump_map(){
     obstacleIDs.append("]\n");
     robotIDs.append("] # starting cell ID : goal ID\n");
 
+    mapFile<<dims;
     mapFile<<obstacleIDs;
     mapFile<<robotIDs;
 
@@ -560,79 +609,60 @@ void Env::dump_map(){
 
 /* DRAWING THE ENVIRONMENT */
 void GridRenderer::draw(Env& env, float t) {
-    std::array<int, 2> eDims = env.getDims();
-    std::array<int, 2> cDims = env.cellDims();
-    std::array<int, 2> ox = env.origin();
+    
+    if(!env.isRunning()){
+        DrawText("SIMULATION PAUSED", 10,10,20,RED);
+    }
 
-    int cellWidth = cDims[0];
-    int cellHeight = cDims[1];
+    DrawText(TextFormat("t = %.2f",t),500,50, 20, BLACK);
 
-    const std::vector<std::shared_ptr<Cell>>& cells = env.getCells();
-    const std::vector<std::shared_ptr<Robot>>& robots = env.getRobots();
+    std::array<int,2> ox = env.origin();
 
-    std::unordered_set<std::shared_ptr<Cell>> detectionCells;
-    int offsetY = 0;
-    int spacing = 30;
+    std::vector<std::shared_ptr<Robot>> robots = env.getRobots();
+    std::vector<std::shared_ptr<Cell>> cells = env.getCells();
 
-    Color rColor = BLACK;
+    float robotRadius = cellH/2;
+    float goalRadius = cellH/3;
 
-    for (auto& robot : robots) {
+    for(auto& c : cells){
+        Robot* tmpRob;
+        std::array<int, 2> pos = c->getPos();
+        std::array<int,2> drawPos = {pos[1]*cellW+1+ox[0], pos[0]*cellH+1+ox[1]};
 
-        rColor = colorFromID(robot->getID());
-
-        if(robot->atGoal()){
-            DrawText(TextFormat("Robot %d at goal", robot->getID()), 10,20+offsetY, 20, rColor);
+        if(c->isObstacle()){
+            DrawRectangle(drawPos[0], drawPos[1], cellH, cellW, GRAY);
         }
         else{
-            if(!robot->isMoving()){
-                DrawText(TextFormat("Robot %d is waiting", robot->getID()), 10, 20 + offsetY, 20, rColor);
-            }
-            else{
-                DrawText(TextFormat("Robot %d is moving", robot->getID()), 10, 20 + offsetY, 20, rColor);
-            }
+            DrawRectangle(drawPos[0], drawPos[1], cellH, cellW, WHITE);
         }
 
-        offsetY += spacing;
+        if(c->isGoal()){
+            DrawCircle(drawPos[0]+cellH/2, drawPos[1]+cellW/2, goalRadius, GREEN);
+        }
 
-        const std::vector<std::shared_ptr<Cell>>& rDetectArea = robot->getArea();
-        detectionCells.insert(rDetectArea.begin(), rDetectArea.end());
+        if((tmpRob = c->getObjID())){
+            DrawCircle(drawPos[0]+cellH/2, drawPos[1]+cellW/2, robotRadius, robotColors[c->getObjID()->getID()]);
+        }
+
+        DrawRectangleLines(drawPos[0], drawPos[1], cellH, cellW, BLACK);
     }
-    
-    DrawText(TextFormat("%f", t), envWidth-200, 20, 20, BLACK);
 
-    int nextX, nextY = ox[1];
+    int offsetY = 30;
+    std::string robotState;
 
-    for (int i = 0; i < eDims[0]; i++) {
-        nextX = ox[0];
-
-        for (int j = 0; j < eDims[1]; j++) {
-            const std::shared_ptr<Cell>& cell = cells[i * eDims[1] + j];
-            Rectangle rect = { (float)nextX, (float)nextY, (float)cellWidth, (float)cellHeight };
-            float radius = rect.width / 2;
-
-            if (detectionCells.find(cell) != detectionCells.end()) {
-                DrawRectangle(rect.x, rect.y, rect.width, rect.height, ORANGE);
-            }
-
-            if (cell->isObstacle()) {
-                DrawRectangle(rect.x, rect.y, rect.width, rect.height, GRAY);
-            }
-
-            if (cell->isGoal()) {
-                //std::cout << "Drawing goal at cell: " << cell->getID() << std::endl;
-                DrawCircle(rect.x + rect.width / 2, rect.y + rect.height / 2, radius / 2, GREEN);
-            }
-
-            if (cell->getObjID() != nullptr) {
-                rColor = colorFromID(cell->getObjID()->getID());
-                DrawCircle(rect.x + rect.width / 2, rect.y + rect.height / 2, radius, rColor);
-            }
-
-            DrawRectangleLines(rect.x, rect.y, rect.width, rect.height, BLACK);
-            nextX += cellWidth;
+    for(auto& robot : robots){
+        int rID = robot->getID();
+        if(robot->atGoal()){
+            robotState = " is at goal";
         }
-
-        nextY += cellHeight;
+        else if(robot->isMoving()){
+            robotState = " is moving";
+        }
+        else{
+            robotState = " is waiting";
+        }
+        DrawText(TextFormat("%d %s", rID, robotState.c_str()), 50,50+offsetY, 20, robotColors[rID]);
+        offsetY+=30;
     }
 
 }
