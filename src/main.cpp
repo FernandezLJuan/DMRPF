@@ -86,55 +86,52 @@ int main(int argc, char* argv[]){
         grid->randomGrid(); /*if the map file was invalid, randomize everything*/
     }
 
-    GridRenderer renderer(w_width,w_height,e_rows, e_cols);
+    GridRenderer renderer(e_cellW,e_cellH,e_rows, e_cols);
+    renderer.cacheRobotColors(e_robs*2);
 
     SetTraceLogLevel(LOG_NONE);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(w_width, w_height, w_title.c_str());
-    SetTargetFPS(60);
+    SetTargetFPS(30);
     EnableEventWaiting();
     
     int mouseID = 0;
-    
+
     while(!WindowShouldClose()){
         if(!IsWindowMinimized()){
 
             float deltaTime = GetFrameTime();
+
+            BeginDrawing();
+
+            ClearBackground(WHITE);
+            renderer.draw(*grid, totalTime);
 
             if(grid->isRunning()){
                 timeElapsed += deltaTime;
                 totalTime += deltaTime;
             }
             
-
             Vector2 mousePos = GetMousePosition();
             mouseID = posToID(*grid,mousePos);
 
             grid->onClick(mouseID);
+
             if(timeElapsed>=timeStep){
                 grid->updateEnvironment();
                 timeElapsed = 0.0;
             }
 
-            BeginDrawing();
-            ClearBackground(WHITE);
-            renderer.draw(*grid, totalTime);
-
-            if(IsKeyDown(KEY_ENTER)){
-                grid->resumeSim();
-            }
-            if(IsKeyDown(KEY_SPACE)){
-                grid->pauseSim();
-            }
             if(IsKeyDown(KEY_UP)){
-                timeStep -=0.01f;
+                if(timeStep>0.01f)
+                    timeStep -=0.01f;
             }
             if(IsKeyDown(KEY_DOWN)){
-                timeStep += 0.01f;
+                if(timeStep<1.0f)
+                    timeStep += 0.01f;
             }
 
             EndDrawing();
-
             usleep(10000);
         }
     }
