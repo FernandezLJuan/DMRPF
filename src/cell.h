@@ -30,6 +30,7 @@ public:
 
     void setType(cellType);
     void logType();
+    void logPos();
 
     Robot* getObjID();
     void setObjID(Robot*);

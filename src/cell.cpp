@@ -87,3 +87,7 @@ void Cell::logType(){
 
     std::cout<<strType<<std::endl;
 }
+
+void Cell::logPos(){
+    std::cout<<"("<<x<<","<<y<<")";
+}
