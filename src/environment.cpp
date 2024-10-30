@@ -5,7 +5,6 @@
 void Env::randomGrid(){
     this->resetEnv(rows, cols,true);
     this->randomizeRobots();
-    std::cout<<"Randomized robots"<<std::endl;
 }
 
 void Env::connectCells() {
@@ -24,7 +23,7 @@ void Env::connectCells() {
 
                 if (ni >= 0 && ni < this->rows && nj >= 0 && nj < this->cols) {
                     int neighborIdx = ni * this->cols + nj;
-                    addEdge(currentIdx, neighborIdx, (abs(dir.first) == abs(dir.second)) ? 2 : 1);
+                    addEdge(currentIdx, neighborIdx, (abs(dir.first) == abs(dir.second)) ? 0 : 1);
                 }
             }
             cells[currentIdx]->updateNeighbors(adjMatrix, *this);
@@ -145,7 +144,9 @@ void Env::updateEnvironment(){
     /*all robots in the environment shall take an action, be it wait or move*/
     for(auto& r : robots){
         if(!r->atGoal()){
-            r->updateDetectionArea(); /*update robot detection area after updating cell neighbors*/
+            r->updateDetectionArea();
+            r->findLeader();
+            r->fetchNeighborInfo();
             r->takeAction();
         }
         else{
@@ -158,6 +159,7 @@ void Env::addObstacle(int id){
     if(id < 0 || id >= (this->cols * this->rows) || cells[id]->getObjID() != nullptr || cells[id]->isGoal()) {
         return;
     }
+
 
     cells[id]->setType(cellType::CELL_OBSTACLE);
     updateNeighborConnections(id, false);
@@ -284,10 +286,18 @@ void Env::resetEnv(int nRows, int nCols, bool randomize) {
 
     this->rows = nRows;
     this->cols = nCols;
+    selectedRobot = nullptr;
+
+    for(auto& c : cells){
+        if(c->getObjID()){
+            c->setObjID(nullptr);
+        }
+    }
 
     Robot::resetID();
-
     robots.clear();
+    std::cout<<"robots size: "<<robots.size()<<std::endl;
+
     robotsAtGoal.clear();
     adjMatrix.clear();
     adjMatrix= std::vector<std::vector<int> >(rows*cols, std::vector<int>(rows*cols, 0));
@@ -295,15 +305,19 @@ void Env::resetEnv(int nRows, int nCols, bool randomize) {
     cells.clear();
     cells.resize(nRows * nCols);
 
-    for (int i = 0; i < nRows * nCols; ++i) {
-        cells[i] = std::make_shared<Cell>(i/nCols*nCols + i%nCols, i / nCols, i % nCols);
-        if(randomize){
-            float isObstacle = obstacleDist(rng);
-            if(isObstacle<obstacleProbability){
-                cells[i]->setType(cellType::CELL_OBSTACLE);
+    for (int i = 0; i < nRows; ++i) {
+        for(int j = 0; j<nCols; ++j){
+            int currIndx = i*cols+j;
+            cells[currIndx] = std::make_shared<Cell>(currIndx, i, j);
+            if(randomize){
+                float isObstacle = obstacleDist(rng);
+                if(isObstacle<obstacleProbability){
+                    cells[currIndx]->setType(cellType::CELL_OBSTACLE);
+                }
             }
         }
     }
+
     this->connectCells();
 }
 
@@ -340,6 +354,8 @@ void Env::updateNeighborConnections(int id, bool isAdding){
 /*ROBOT MANIPULATION FUNCTIONS*/
 int Env::placeRobot(Robot* r){
     
+    std::cout<<"Placing robots "<<std::endl;
+
     if(r->getCurrentCell()->getObjID()){
         return -1;
     }
@@ -355,12 +371,21 @@ int Env::placeRobot(Robot* r){
     }
 
     cells[posID]->setObjID(r);
+
+/*     std::sort(robots.begin(), robots.end(),[](const std::shared_ptr<Robot>& r1, const std::shared_ptr<Robot>& r2){
+        return r1->getID()>r2->getID();
+    }); */
+
     return 0;
 }
 
 int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
     /*never move robot if the next cell already has a robot in it*/
     if(nextCell->getObjID()){
+        return -1;
+    }
+
+    if(nextCell == r->getCurrentCell()){
         return -1;
     }
 
@@ -386,34 +411,25 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
     }
 }
 
-int Env::detectConflict(Robot* r1, Robot* r2){
-
+int Env::detectConflict(Robot& r1, Robot& r2){
     /*ROBOTS SOLVE THE CONFLICTS INTERNALLY*/
-
     int conflictType = 0; /*assume no conflict exists*/
 
-    auto makeOrderedPair = [](Robot* ri, Robot* rj){
-        return (ri->getID() < rj->getID()) ? std::make_pair(ri,rj) : std::make_pair(rj,ri);
+    auto makeOrderedTuple = [](int id1, int id2, int type) {
+            return (id1 < id2) ? std::make_tuple(id1, id2, type) : std::make_tuple(id2, id1, type);
     };
 
-    std::pair<Robot*, Robot*> confPair = makeOrderedPair(r1,r2);
-    if(checkedConflicts.find(confPair) != checkedConflicts.end()){
-        return -1;
-    }
-    checkedConflicts.insert(confPair);
-    std::cout<<"Conflict checked for "<<r1->getID()<<" and "<<r2->getID()<<std::endl;
-
     /*collect the necessary info to check for conflicts*/
-    std::shared_ptr<Cell> r1_curr = r1->getCurrentCell();
-    std::shared_ptr<Cell> r1_nn = r1->step();
-    std::vector<std::shared_ptr<Cell>> r1_remNodes = r1->getPath();
-    int r1_nFollowers = r1->getNFollowers();
+    std::shared_ptr<Cell> r1_curr = r1.getCurrentCell();
+    std::shared_ptr<Cell> r1_nn = r1.step();
+    std::vector<std::shared_ptr<Cell>> r1_remNodes = r1.getPath();
+    int r1_nFollowers = r1.getNFollowers();
 
-    std::shared_ptr<Cell> r2_curr = r2->getCurrentCell();
-    std::shared_ptr<Cell> r2_nn = r2->step();
-    std::vector<std::shared_ptr<Cell>> r2_remNodes = r2->getPath();
-    int r2_nFollowers = r2->getNFollowers();
-    
+    std::shared_ptr<Cell> r2_curr = r2.getCurrentCell();
+    std::shared_ptr<Cell> r2_nn = r2.step();
+    std::vector<std::shared_ptr<Cell>> r2_remNodes = r2.getPath();
+    int r2_nFollowers = r2.getNFollowers();
+
     /*OPPOSITE CONFLICT*/
     if(r1_curr == r2_nn && r1_nn == r2_curr){
         conflictType = 1;
@@ -432,7 +448,6 @@ void Env::remakePaths(){
     for(auto& r : robots){
         r->generatePath();
     }
-    this->resumeSim();
 }
 
 void Env::addGoal(int id){
@@ -614,8 +629,6 @@ void GridRenderer::draw(Env& env, float t) {
         DrawText("SIMULATION PAUSED", 10,10,20,RED);
     }
 
-    DrawText(TextFormat("t = %.2f",t),500,50, 20, BLACK);
-
     std::array<int,2> ox = env.origin();
 
     std::vector<std::shared_ptr<Robot>> robots = env.getRobots();
@@ -628,6 +641,13 @@ void GridRenderer::draw(Env& env, float t) {
         Robot* tmpRob;
         std::array<int, 2> pos = c->getPos();
         std::array<int,2> drawPos = {pos[1]*cellW+1+ox[0], pos[0]*cellH+1+ox[1]};
+
+        if(pos[0]==0){
+            DrawText(TextFormat("%d",pos[1]), drawPos[0]+cellW/3,drawPos[1]-30,20,WHITE);
+        }
+        if(c->getID()%cols==0){
+            DrawText(TextFormat("%d",pos[0]), drawPos[0]-20,drawPos[1],20,WHITE);
+        }
 
         if(c->isObstacle()){
             DrawRectangle(drawPos[0], drawPos[1], cellH, cellW, GRAY);
@@ -649,6 +669,12 @@ void GridRenderer::draw(Env& env, float t) {
 
     int offsetY = 30;
     std::string robotState;
+    Color robotDisplayColor = {0xeb,0xed,0xeb,255};
+    Rectangle displayRect = {30,40,150,static_cast<float>(50*robots.size())};
+    
+    DrawRectangle(displayRect.x,displayRect.y,displayRect.width,displayRect.height, robotDisplayColor);
+    DrawRectangleLinesEx(displayRect,5.0f, BLACK);
+    DrawText(TextFormat("t = %.2f",t),displayRect.x+20,displayRect.y+20, 20, BLACK);
 
     for(auto& robot : robots){
         int rID = robot->getID();
@@ -661,8 +687,7 @@ void GridRenderer::draw(Env& env, float t) {
         else{
             robotState = " is waiting";
         }
-        DrawText(TextFormat("%d %s", rID, robotState.c_str()), 50,50+offsetY, 20, robotColors[rID]);
+        DrawText(TextFormat("%d %s", rID, robotState.c_str()), 50,60+offsetY, 20, robotColors[rID]);
         offsetY+=30;
     }
-
 }
