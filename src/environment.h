@@ -9,14 +9,15 @@
 #include <random>
 #include <vector>
 #include <raylib.h>
+#include <tuple>
 #include <set>
 #include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include "robot.h"
 #include "cell.h"
 
-class Robot;
 
 typedef std::mt19937 MyRNG;
 
@@ -56,7 +57,7 @@ public:
     /*ROBOT MANAGEMENT FUNCTIONS*/
     int placeRobot(Robot*); /*place robot in the environment*/
     int moveRobot(Robot* , std::shared_ptr<Cell>); /*update robot position*/
-    int detectConflict(Robot*, Robot*); /*return the type of conflict it has detected*/
+    int detectConflict(Robot&, Robot&); /*return the type of conflict it has detected*/
     void remakePaths();
     void addGoal(int);
     void removeGoal(int);
@@ -105,7 +106,7 @@ private:
     std::set<std::shared_ptr<Robot>> robotsAtGoal; /*each robot on the environment*/
     Robot* selectedRobot = nullptr;
 
-    std::set<std::pair<Robot*, Robot*>> checkedConflicts; 
+    std::set<std::tuple<int,int,int>> checkedConflicts; 
     /*pairs of robots for which conflicts have been checked, this way we don't check the same robots over and over*/
 
 };
@@ -125,7 +126,6 @@ public:
         unsigned char b = (id * 97) % 256;
 
         return Color{r,g,b,255}; /*keep opacity at max value (255)*/
-
     }
 
     void cacheRobotColors(int nRobots){
