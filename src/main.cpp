@@ -89,6 +89,8 @@ int main(int argc, char* argv[]){
     GridRenderer renderer(e_cellW,e_cellH,e_rows, e_cols);
     renderer.cacheRobotColors(e_robs*2);
 
+    Color bgColor = {0x36,0x39,0x3e};
+
     SetTraceLogLevel(LOG_NONE);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(w_width, w_height, w_title.c_str());
@@ -104,7 +106,7 @@ int main(int argc, char* argv[]){
 
             BeginDrawing();
 
-            ClearBackground(WHITE);
+            ClearBackground(bgColor);
             renderer.draw(*grid, totalTime);
 
             if(grid->isRunning()){
