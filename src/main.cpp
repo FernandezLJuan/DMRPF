@@ -3,7 +3,7 @@
 #include <libconfig.h++>
 #include <unistd.h>
 
-//TODO: ADD KEYBIND TO PLACE ROBOT AT POSITION
+//TODO: implement priority rules
 
 float totalTime = 0.0f;
 float timeElapsed = 0.0f;
@@ -89,10 +89,9 @@ int main(int argc, char* argv[]){
     GridRenderer renderer(e_cellW,e_cellH,e_rows, e_cols);
     renderer.cacheRobotColors(e_robs*2);
 
-    Color bgColor = {0x36,0x39,0x3e};
+    Color bgColor = {0x36,0x39,0x3e,255};
 
     SetTraceLogLevel(LOG_NONE);
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(w_width, w_height, w_title.c_str());
     SetTargetFPS(30);
     EnableEventWaiting();
