@@ -125,15 +125,11 @@ bool Env::onClick(int id){
 
 /*ENVIRONMENT MODIFICATION*/
 void Env::updateEnvironment(){
-
     /*if all robots are at goal, pause the simulation*/
     if(robots.size() == robotsAtGoal.size() && robots.size()>0){
         std::cout<<"All robots at goal, pausing simulation"<<std::endl;
         running = false;
     }
-
-    checkedConflicts.clear();
-
     /*if the simulation is paused don't update environment*/
     if(!running){
         return;
@@ -143,14 +139,14 @@ void Env::updateEnvironment(){
 
     /*all robots in the environment shall take an action, be it wait or move*/
     for(auto& r : robots){
-        if(!r->atGoal()){
+        if(r){
             r->updateDetectionArea();
-            r->findLeader();
+            r->findFollowers();
             r->fetchNeighborInfo();
             r->takeAction();
-        }
-        else{
-            robotsAtGoal.insert(r);
+            if(r->atGoal()){
+                robotsAtGoal.insert(r);
+            }
         }
     }
 }
@@ -175,8 +171,6 @@ void Env::removeObstacle(int id){
     }
 
     cells[id]->setType(cellType::CELL_FREE);
-    std::cout<<"Removed obstacle from "<<id<<std::endl;
-
     updateNeighborConnections(id, true);
 }
 
@@ -385,7 +379,9 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
         return -1;
     }
 
+    /*don't move robot if it wants to go to the same position*/
     if(nextCell == r->getCurrentCell()){
+        std::cout<<"stay there pal"<<std::endl;
         return -1;
     }
 
@@ -414,7 +410,6 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
 int Env::detectConflict(Robot& r1, Robot& r2){
     /*ROBOTS SOLVE THE CONFLICTS INTERNALLY*/
     int conflictType = 0; /*assume no conflict exists*/
-
     auto makeOrderedTuple = [](int id1, int id2, int type) {
             return (id1 < id2) ? std::make_tuple(id1, id2, type) : std::make_tuple(id2, id1, type);
     };
