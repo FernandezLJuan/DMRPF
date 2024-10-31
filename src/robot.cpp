@@ -97,6 +97,7 @@ void Robot::generatePath() {
 void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the robot*/
 
     if(newPos==nullptr){
+        std::cout<<"sorry, null position"<<std::endl;
         return;
     }
 
@@ -160,7 +161,7 @@ void Robot::updateDetectionArea() {
     }
 }
 
-void Robot::getGiveWayNode(){
+bool Robot::findGiveWayNode(){
     /*scan surrounding cells of the current cell*/
     for (const auto& neighbor : currentCell->getNeighbors()) {
         /*if there isn't a robot in the neighbor, use it as give way node*/
@@ -169,6 +170,9 @@ void Robot::getGiveWayNode(){
             break;
         }
     }
+
+    /*if a giveWayNode is found, return true*/
+    return (giveWayNode) ? true : false;
 }
 
 void Robot::fetchNeighborInfo(){
@@ -181,6 +185,7 @@ void Robot::fetchNeighborInfo(){
             if(n){
                 switch(environment->detectConflict(*this, *n)){
                     case 0:
+                        /*NO CONFLICT IS DETECTED*/
                         if(follower != nullptr){
                             if(follower->getPath().size() > path.size()){
                                 this->giveWay();
@@ -188,19 +193,19 @@ void Robot::fetchNeighborInfo(){
                         }
                         break;
                     case 1:
-                        //std::cout<<"OPPOSITE CONFLICT BETWEEN "<<id<<" AND "<<n->getID()<<std::endl;
-                        //solveIntersectionConflict(n);
+                        /*OPPOSITE CONFLICT*/
+                        
                         break;
                     case 2:
-                        //std::cout<<"INTERSECTION CONFLICT BETWEEN "<<id<<" AND "<<n->getID()<<std::endl;
-                        solveIntersectionConflict(*n);
+                        /*INTERSECTION CONFLICT*/
+                        determinePriority(this,n);
                         break;
                 }
             }
     }
 }
 
-void Robot::findLeader(){
+void Robot::findFollowers(){
     numberFollowers = 0;
     std::shared_ptr<Cell> nextCell = this->step();
 
@@ -229,61 +234,64 @@ void Robot::findLeader(){
                     follower = nullptr;
                 }
             }
+
+            auto it = std::find(neighborsRequestingNode.begin(), neighborsRequestingNode.end(), n);
+            if (it != neighborsRequestingNode.end()) {
+                neighborsRequestingNode.erase(it);
+            }
+            else if(n->step() == currentCell){
+                neighborsRequestingNode.push_back(n);
+            }
         }
     }
 }
 
-void Robot::solveIntersectionConflict(Robot& rn){
-    /*check for each priority rule and solve the conflict accordingly*/
+Robot* Robot::determinePriority(Robot* r1, Robot* r2) {
+    /* check which robot has the highest priority and return it */
+    std::cout << "FOR ROBOTS: " << r1->getID() << " AND " << r2->getID() << std::endl;
 
-    std::cout<<"Checking priority rule number 1"<<std::endl;
-    /*move the robot occupying the intersection node*/
-    if(rn.getCurrentCell() == this->step()){
-        this->giveWay();
-        return;
-    }
-    else if(this->getCurrentCell() == rn.step()){
-        rn.giveWay();
-        return;
-    }
-    
-    std::cout<<"Checking priority rule number 2"<<std::endl;
-    /*if a robot is giving way, it has priority*/
-    if(rn.isGivingWay()){
-        rn.takeAction();
-        return;
-    }
-    else if(this->isGivingWay()){
-        this->takeAction();
-        return;
-    }
+    std::shared_ptr<Cell> criticalNode = (r1->step() == r2->step()) ? r1->step() : nullptr;
 
-    std::cout<<"Checking priority rule number 3"<<std::endl;
-    /*the robot with the highest nFollowers has priority*/
-    if(rn.getNFollowers()>this->numberFollowers){
-        rn.takeAction();
-        return;
-    }
-    else if(this->numberFollowers<rn.getNFollowers()){
-        this->takeAction();
-        return;
-    }
+    /* priority rule number 1: robot occupying critical node is given priority */
+    std::cout << "checking rule 1" << std::endl;
+    if (r1->getCurrentCell() == criticalNode) return r1;
+    if (r2->getCurrentCell() == criticalNode) return r2;
 
-    std::cout<<"Checking priority rule number 4"<<std::endl;
-    
+    /* priority rule number 2: a robot giving way to another robot is given priority */
+    std::cout << "checking rule 2" << std::endl;
+    if (r1->isGivingWay()) return r1;
+    if (r2->isGivingWay()) return r2;
 
-    std::cout<<"Checking priority rule number 5"<<std::endl;
+    /* priority rule number 3: the robot with the highest nFollowers is given priority */
+    std::cout << "checking rule 3" << std::endl;
+    if (r1->getNFollowers() > r2->getNFollowers()) return r1;
+    if (r2->getNFollowers() > r1->getNFollowers()) return r2;
 
-    std::cout<<"Checking priority rule number 6"<<std::endl;
+    /* priority rule number 4: a robot having a free neighboring node is given priority */
+    std::cout << "checking rule 4" << std::endl;
+    if (r1->findGiveWayNode()) return r1;
+    if (r2->findGiveWayNode()) return r2;
+
+    /* priority rule number 5: the robot with the highest neighborsRequestingMyNode is given priority */
+    std::cout << "checking rule 5" << std::endl;
+    if (r1->getNeighborsRequestingNode() > r2->getNeighborsRequestingNode()) return r1;
+    if (r2->getNeighborsRequestingNode() > r1->getNeighborsRequestingNode()) return r2;
+
+    /* priority rule number 6: the robot with the longest path is given priority */
+    std::cout << "checking rule 6" << std::endl;
+    if (r1->getPath().size() > r2->getPath().size()) return r1;
+    if (r2->getPath().size() > r1->getPath().size()) return r2;
+
+    /* Default case, if none of the above rules apply */
+    return nullptr;
 }
 
-void Robot::giveWay(){
-    getGiveWayNode();
-    if(giveWayNode){
-        path.insert(path.begin(), lastCell);
-        path.insert(path.begin(), giveWayNode);
 
-        takeAction();
+void Robot::giveWay(){
+    findGiveWayNode();
+    if(giveWayNode){
+        path.insert(path.begin(), currentCell);
+        path.insert(path.begin(), giveWayNode);
     }
 }
 
@@ -334,7 +342,7 @@ bool Robot::isMoving(){
 }
 
 bool Robot::isGivingWay(){
-    return currentCell == giveWayNode;
+    return currentCell == giveWayNode || path.front()==giveWayNode;
 }
 
 int Robot::getID(){
@@ -343,6 +351,10 @@ int Robot::getID(){
 
 int Robot::getNFollowers(){
     return numberFollowers;
+}
+
+int Robot::getNeighborsRequestingNode(){
+    return neighborsRequestingNode.size();
 }
 
 std::shared_ptr<Cell> Robot::getCurrentCell(){return this->currentCell;}
