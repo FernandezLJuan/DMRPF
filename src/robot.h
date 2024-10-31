@@ -28,12 +28,13 @@ public:
     void stopRobot();
     void resumeRobot();
     void reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>>, std::shared_ptr<Cell>);
-    void findLeader();
-    void solveIntersectionConflict(Robot&);
+    void findFollowers();
     void giveWay();
 
+    Robot* determinePriority(Robot*, Robot*);
+
     void updateDetectionArea();
-    void getGiveWayNode();
+    bool findGiveWayNode();
     void takeAction();
     std::shared_ptr<Cell> step();/*next step in path*/
 
@@ -42,6 +43,7 @@ public:
     /*GETTERS AND SETTERS*/
     int getID();
     int getNFollowers();
+    int getNeighborsRequestingNode(); /*return how many neighbors are requesting this node*/
     std::array<int, 2> getPos(); /*get x,y position on the grid (is it redundant?)*/
     std::shared_ptr<Cell> getCurrentCell();
     std::vector<std::shared_ptr<Cell>> getArea(); /*retyurn detection area, used for drawing*/
