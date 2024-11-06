@@ -18,7 +18,6 @@
 #include "robot.h"
 #include "cell.h"
 
-
 typedef std::mt19937 MyRNG;
 
 class Env{

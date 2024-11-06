@@ -32,6 +32,7 @@ void Env::connectCells() {
     }
 }
 
+
 /*SIMULATION RELATED FUNCTIONS*/
 void Env::pauseSim(){
     running = false;
@@ -123,13 +124,15 @@ bool Env::onClick(int id){
 
 }
 
+
 /*ENVIRONMENT MODIFICATION*/
 void Env::updateEnvironment(){
     /*if all robots are at goal, pause the simulation*/
-    if(robots.size() == robotsAtGoal.size() && robots.size()>0){
+    if(robotsAtGoal.size() == nRobots && nRobots!=0){
         std::cout<<"All robots at goal, pausing simulation"<<std::endl;
-        running = false;
+        this->pauseSim();
     }
+
     /*if the simulation is paused don't update environment*/
     if(!running){
         return;
@@ -146,6 +149,11 @@ void Env::updateEnvironment(){
             r->takeAction();
             if(r->atGoal()){
                 robotsAtGoal.insert(r);
+            }
+
+            /*if a robot is saved as a robot at goal but is no longer at his goal, remove it from the set*/
+            if(robotsAtGoal.find(r) != robotsAtGoal.end() && !r->atGoal()){
+                robotsAtGoal.erase(r);
             }
         }
     }
@@ -348,8 +356,6 @@ void Env::updateNeighborConnections(int id, bool isAdding){
 /*ROBOT MANIPULATION FUNCTIONS*/
 int Env::placeRobot(Robot* r){
     
-    std::cout<<"Placing robots "<<std::endl;
-
     if(r->getCurrentCell()->getObjID()){
         return -1;
     }
@@ -478,12 +484,19 @@ void Env::randomizeRobots(){
         robots.emplace_back(std::make_shared<Robot>(randomCell, this));
         randomCell = cells[rand()%cells.size()];
 
+
+        /*don't place a goal there if it is already a goal cell*/
+        do{
+            randomCell = cells[rand()%cells.size()];
+        }while(randomCell->isGoal());
+
         this->placeRobot(robots.back().get());
         robots.back()->setGoal(randomCell);
 
         placedRobots++;
     }
 }
+
 
 /*GETTERS AND SETTERS*/
 std::array<int, 2> Env::getDims(){
@@ -514,6 +527,7 @@ std::shared_ptr<Cell> Env::getCellByPos(int x, int y){
 
 std::vector<std::shared_ptr<Cell>> Env::getCells(){return cells;}
 std::vector<std::shared_ptr<Robot>> Env::getRobots(){return robots;}
+
 
 /*OTHER ENVIRONMENT INFO*/
 bool Env::isRunning(){
@@ -617,12 +631,15 @@ void Env::dump_map(){
 
 }
 
+
 /* DRAWING THE ENVIRONMENT */
 void GridRenderer::draw(Env& env, float t) {
     
     if(!env.isRunning()){
         DrawText("SIMULATION PAUSED", 10,10,20,RED);
     }
+
+    std::array<int, 2> eDims = env.getDims();
 
     std::array<int,2> ox = env.origin();
 
@@ -637,11 +654,11 @@ void GridRenderer::draw(Env& env, float t) {
         std::array<int, 2> pos = c->getPos();
         std::array<int,2> drawPos = {pos[1]*cellW+1+ox[0], pos[0]*cellH+1+ox[1]};
 
-        if(pos[0]==0){
-            DrawText(TextFormat("%d",pos[1]), drawPos[0]+cellW/3,drawPos[1]-30,20,WHITE);
+        if (pos[0] == 0) {
+            DrawText(TextFormat("%d", pos[1]), drawPos[0] + cellW / 2 - 10, drawPos[1] - 30, 20, WHITE);
         }
-        if(c->getID()%cols==0){
-            DrawText(TextFormat("%d",pos[0]), drawPos[0]-20,drawPos[1],20,WHITE);
+        if (c->getID() % eDims[1] == 0) {
+            DrawText(TextFormat("%d", pos[0]), drawPos[0] - 25, drawPos[1] + cellH / 2 - 10, 20, WHITE);
         }
 
         if(c->isObstacle()){
@@ -663,9 +680,12 @@ void GridRenderer::draw(Env& env, float t) {
     }
 
     int offsetY = 30;
+    const float baseHeight = 80; //minium height for display rectangle
+    float height = static_cast<float>(55 * robots.size());
+    height = (height < baseHeight) ? baseHeight : height;   
     std::string robotState;
     Color robotDisplayColor = {0xeb,0xed,0xeb,255};
-    Rectangle displayRect = {30,40,150,static_cast<float>(50*robots.size())};
+    Rectangle displayRect = {30,40,150,height};
     
     DrawRectangle(displayRect.x,displayRect.y,displayRect.width,displayRect.height, robotDisplayColor);
     DrawRectangleLinesEx(displayRect,5.0f, BLACK);
