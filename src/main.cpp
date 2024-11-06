@@ -3,19 +3,19 @@
 #include <libconfig.h++>
 #include <unistd.h>
 
-//TODO: implement priority rules
+//TODO: FIND OUT WHY LOOPS APPEAR ON SOME ROBOTS AFTER SOLVING A CONFLICT
+//TODO: SOLVE LOOPS IN GIVE WAY TO LEADER AND GIVE WAY IN CONFLICT
+
 
 float totalTime = 0.0f;
 float timeElapsed = 0.0f;
-float timeStep = 0.1f;
+float timeStep = 0.2f;
 
 void loadSettings(std::string path){
 /*load settings from file configuration at path*/
-
     libconfig::Config cfg;
 
     cfg.readFile(path.c_str());
-
 }
 
 int posToID(Env& env, Vector2 mousePos){
