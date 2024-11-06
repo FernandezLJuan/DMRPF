@@ -23,7 +23,7 @@ void Env::connectCells() {
 
                 if (ni >= 0 && ni < this->rows && nj >= 0 && nj < this->cols) {
                     int neighborIdx = ni * this->cols + nj;
-                    addEdge(currentIdx, neighborIdx, (abs(dir.first) == abs(dir.second)) ? 0 : 1);
+                    addEdge(currentIdx, neighborIdx, (abs(dir.first) == abs(dir.second)) ? 2 : 1);
                 }
             }
             cells[currentIdx]->updateNeighbors(adjMatrix, *this);
