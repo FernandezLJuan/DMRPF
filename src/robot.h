@@ -1,5 +1,6 @@
 #pragma once
 #include "environment.h"
+#include <format>
 #include <stack>
 #include <unordered_set>
 
@@ -14,6 +15,9 @@ public:
         path.push_back(currentCell);
         pathHistory.push_back(currentCell);
         this->updateDetectionArea();
+
+        leader = nullptr;
+        follower = nullptr;
     }
 
     static void resetID(){
@@ -29,7 +33,11 @@ public:
     void resumeRobot();
     void reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>>, std::shared_ptr<Cell>);
     void findFollowers();
+    bool isInFollowerChain(Robot*);
     void giveWay();
+    void retreat();
+    void solveIntersectionConflict(Robot*);
+    void solveOppositeConflict(Robot*);
 
     Robot* determinePriority(Robot*, Robot*);
 
@@ -55,6 +63,7 @@ public:
     void removeGoal();
     void setLeader(Robot*);
     void setFollower(Robot*);
+    Robot* getLeader();
 
 private:
 
@@ -66,11 +75,8 @@ private:
 
     int id;
     int numberFollowers;
-    int lastAction = 0; /*waited = 0, moved = 1*/
-    int nextAction = 0; /*wait = 0, move = 1, give way = 2*/
 
     bool moving = true; /*in case robot needs to be stopped before arriving at goal*/
-    
 
     void move(std::shared_ptr<Cell>); /*move to a new position, only one cell at a time*/
     void followPath(); /*follow generated path*/
@@ -92,5 +98,5 @@ private:
     std::vector<Robot*> neighbors; /*robots inside detection area*/
 
     Robot* leader; /*pointer to leader of the chain*/
-    Robot* follower = nullptr; /*pointer to the nearest follower*/
+    Robot* follower; /*pointer to the nearest follower*/
 };
