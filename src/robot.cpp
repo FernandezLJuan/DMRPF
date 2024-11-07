@@ -31,9 +31,6 @@ void Robot::takeAction(){
 
     if(moving){
         if(!path.empty()){
-            std::cout<<id<<" next cell is ";
-            path.front()->logPos();
-            std::cout<<std::endl;
             this->move(path.front());
         }
     }
@@ -202,26 +199,20 @@ void Robot::fetchNeighborInfo(){
                         if(follower){
                             /*if our follower has a longer path than ours, move out of the way*/
                             if(follower->getPath().size() > path.size() && !follower->isGivingWay()){
-                                std::cout<<id<<" Follower path is: ("<<follower->getID()<<")"<<std::endl;
-                                for(auto& c : follower->getPath()){
-                                    c->logPos();
-                                    std::cout<<", ";
-                                }
-                                std::cout<<std::endl;
                                 this->giveWay();
                             }
                         }
-                        if(leader){
-                            if(!leader->isMoving() && !leader->atGoal()){
-                                std::cout<<id<<" waiting for leader "<<leader->getID()<<std::endl;
-                                this->stopRobot();
-                            }
-                            else if(leader->isMoving() && leader->step() == currentCell && !leader->isGivingWay()){
-                                //if the leader's next step is trying to move to our cell and it is not giving way to another robot, give way to it
-                                std::cout<<id<<" giving way to leader "<<leader->getID()<<std::endl;
-                                this->giveWay();
-                            }
-                        }
+                        // if(leader){
+                        //     if(!leader->isMoving() && !leader->atGoal()){
+                        //         std::cout<<id<<" waiting for leader "<<leader->getID()<<std::endl;
+                        //         this->stopRobot();
+                        //     }
+                        //     else if(leader->isMoving() && leader->step() == currentCell && !leader->isGivingWay()){
+                        //         //if the leader's next step is trying to move to our cell and it is not giving way to another robot, give way to it
+                        //         std::cout<<id<<" giving way to leader "<<leader->getID()<<std::endl;
+                        //         this->giveWay();
+                        //     }
+                        // }
                         break;
                     case 1:
                         /*OPPOSITE CONFLICT*/
@@ -246,7 +237,7 @@ void Robot::findFollowers(){
 
     for(auto& n : neighbors){
         if(n){
-            if(isInHistory(n->step()) && isInHistory(n->getCurrentCell())){ 
+            if(n->step() == currentCell){ 
                 /*check if the robot's next cell is in my history of cells, then set as follower*/
                 if(!isInFollowerChain(n) && !n->getLeader()){
                     /*if the robot is already in the chain of followers, don't set it as my follower*/
@@ -258,7 +249,7 @@ void Robot::findFollowers(){
 
             if(n == follower){                
                 /*if the follower has stopped being in the path history*/
-                if(!isInHistory(n->getCurrentCell()) || !isInHistory(n->step())){
+                if(n->step() != currentCell){
                     numberFollowers--;
                     follower = nullptr;
                     n->setLeader(nullptr);
@@ -349,26 +340,19 @@ void Robot::solveIntersectionConflict(Robot* n){
 
     /*based on that, the robot of more priority checks if it's n(t+2) node is free
     (a free node is one wich is not an obstacle or is not occupied by another robot in that time step)*/
-    if(!priorityPath[2]->isObstacle() && !obstacleRobot){
-        /*if the node is free, the low priority robot waits*/
-        nonPriorityRobot->stopRobot();
+    if(!obstacleRobot){
+        for(auto& r : priorityRobot->neighborsRequestingNode){
+            /*robots requesting that node must wait*/
+            r->stopRobot();
+        }
     }
-    else if(obstacleRobot){
-        if(obstacleRobot->findGiveWayNode() && !obstacleRobot->isGivingWay()){
-            std::cout<<obstacleRobot->getID()<<" moving out of the way on an intersection conflict with "<<priorityRobot->getID()<<std::endl;
-            obstacleRobot->giveWay();
-        }
-        else if(obstacleRobot->isGivingWay()){
-            obstacleRobot->stopRobot();
-        }
-        else{
-            /*if no neighboring node is found, ask neighbor robot to move out of the way*/
-            for(auto& n : obstacleRobot->neighbors){
-                if(n->findGiveWayNode()){
-                    std::cout<<"neighbor "<<n->getID()<<" asked to give way for robot "<<obstacleRobot->getID()<<std::endl;
-                    n->giveWay();
-                    break;
-                }
+    else if(obstacleRobot->findGiveWayNode()){
+        obstacleRobot->giveWay();
+    }
+    else{
+        for(auto& n:obstacleRobot->neighbors){
+            if(n->findGiveWayNode()){
+                n->giveWay();
             }
         }
     }
@@ -389,8 +373,7 @@ void Robot::solveOppositeConflict(Robot* n){
         priorityRobot->giveWay();
     }
     else{
-        std::cout<<lowPriorityRobot->getID()<<" retreating"<<std::endl;
-        lowPriorityRobot->retreat();
+        std::cout<<"need to retreat"<<std::endl;
     }
 
 }
@@ -467,8 +450,16 @@ bool Robot::isGivingWay(){
     auto isGivewayInPath = [this](std::shared_ptr<Cell> c)->bool{
         return std::find(this->path.begin(), this->path.end(), this->giveWayNode) != this->path.end();
     };
-    
     return isGivewayInPath(giveWayNode);
+}
+
+void Robot::logPath(){
+    std::cout<<"I'm "<<id<<" and my path is: "<<std::endl;
+    for(auto& c: path){
+        c->logPos();
+        std::cout<<", ";
+    }
+    std::cout<<std::endl;
 }
 
 int Robot::getID(){
