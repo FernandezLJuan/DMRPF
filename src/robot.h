@@ -18,6 +18,9 @@ public:
 
         leader = nullptr;
         follower = nullptr;
+
+        plannedAction = 1;
+        numberFollowers = 0;
     }
 
     static void resetID(){
@@ -64,6 +67,7 @@ public:
     void setLeader(Robot*);
     void setFollower(Robot*);
     Robot* getLeader();
+    void logPath();
 
 private:
 
@@ -77,6 +81,7 @@ private:
     int numberFollowers;
 
     bool moving = true; /*in case robot needs to be stopped before arriving at goal*/
+    int plannedAction; /*0 wait, 1 move*/
 
     void move(std::shared_ptr<Cell>); /*move to a new position, only one cell at a time*/
     void followPath(); /*follow generated path*/
