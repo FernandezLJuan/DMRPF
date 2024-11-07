@@ -23,11 +23,10 @@ void Env::connectCells() {
 
                 if (ni >= 0 && ni < this->rows && nj >= 0 && nj < this->cols) {
                     int neighborIdx = ni * this->cols + nj;
-                    addEdge(currentIdx, neighborIdx, (abs(dir.first) == abs(dir.second)) ? 2 : 1);
+                    addEdge(currentIdx, neighborIdx, (abs(dir.first) == abs(dir.second)) ? 0 : 1);
                 }
             }
             cells[currentIdx]->updateNeighbors(adjMatrix, *this);
-
         }
     }
 }
@@ -84,6 +83,12 @@ bool Env::onClick(int id){
         }
     }
 
+    if(IsKeyPressed(KEY_P)){
+        if(selectedRobot){
+            selectedRobot->logPath();
+        }
+    }
+
     if(id<0 || id>cells.size()){
         return false;
     }
@@ -121,7 +126,6 @@ bool Env::onClick(int id){
     }
 
     return true;
-
 }
 
 
@@ -341,7 +345,7 @@ void Env::updateNeighborConnections(int id, bool isAdding){
             int neighborID = newRow * this->cols + newCol;
 
             if (isAdding) {
-                addEdge(id, neighborID, (abs(dir.first) == abs(dir.second)) ? 2 : 1);
+                addEdge(id, neighborID, (abs(dir.first) == abs(dir.second)) ? 0 : 1);
             } else {
                 removeEdge(id, neighborID);
             }
@@ -466,6 +470,8 @@ void Env::removeGoal(int id){
 
 void Env::randomizeRobots(){
     
+    std::cout<<"\n\nRANDOMIZING ROBOTS"<<std::endl;
+
     std::shared_ptr<Cell> randomCell;
     std::array<int, 2> rPos = {0,0};
     Vector2 rGoal;
@@ -492,6 +498,7 @@ void Env::randomizeRobots(){
 
         this->placeRobot(robots.back().get());
         robots.back()->setGoal(randomCell);
+        robots.back()->logPath();
 
         placedRobots++;
     }
