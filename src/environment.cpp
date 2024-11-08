@@ -23,14 +23,13 @@ void Env::connectCells() {
 
                 if (ni >= 0 && ni < this->rows && nj >= 0 && nj < this->cols) {
                     int neighborIdx = ni * this->cols + nj;
-                    addEdge(currentIdx, neighborIdx, (abs(dir.first) == abs(dir.second)) ? 0 : 1);
+                    addEdge(currentIdx, neighborIdx, (abs(dir.first) == abs(dir.second)) ? 2 : 1);
                 }
             }
             cells[currentIdx]->updateNeighbors(adjMatrix, *this);
         }
     }
 }
-
 
 /*SIMULATION RELATED FUNCTIONS*/
 void Env::pauseSim(){
@@ -128,9 +127,9 @@ bool Env::onClick(int id){
     return true;
 }
 
-
 /*ENVIRONMENT MODIFICATION*/
-void Env::updateEnvironment(){
+void Env::updateEnvironment(float t){
+    std::cout<<"Updating for timeStep: "<<t<<std::endl;
     /*if all robots are at goal, pause the simulation*/
     if(robotsAtGoal.size() == nRobots && nRobots!=0){
         std::cout<<"All robots at goal, pausing simulation"<<std::endl;
@@ -142,23 +141,26 @@ void Env::updateEnvironment(){
         return;
     }
 
-    /*add transient obstacle*/
-
     /*all robots in the environment shall take an action, be it wait or move*/
     for(auto& r : robots){
-        if(r){
-            r->updateDetectionArea();
-            r->findFollowers();
-            r->fetchNeighborInfo();
-            r->takeAction();
-            if(r->atGoal()){
-                robotsAtGoal.insert(r);
-            }
+        if(!r){
+            std::cout<<"invalid pointer"<<std::endl;
+            continue;
+        }
 
-            /*if a robot is saved as a robot at goal but is no longer at his goal, remove it from the set*/
-            if(robotsAtGoal.find(r) != robotsAtGoal.end() && !r->atGoal()){
-                robotsAtGoal.erase(r);
-            }
+        r->updateDetectionArea();
+        r->getNeighbors();
+        r->findFollowers();
+        r->fetchNeighborInfo();
+        r->takeAction();
+
+        if(r->atGoal()){
+            robotsAtGoal.insert(r);
+        }
+
+        /*if a robot is saved as a robot at goal but is no longer at his goal, remove it from the set*/
+        if(robotsAtGoal.find(r) != robotsAtGoal.end() && !r->atGoal()){
+            robotsAtGoal.erase(r);
         }
     }
 }
@@ -301,6 +303,7 @@ void Env::resetEnv(int nRows, int nCols, bool randomize) {
     }
 
     Robot::resetID();
+
     robots.clear();
     std::cout<<"robots size: "<<robots.size()<<std::endl;
 
@@ -345,7 +348,7 @@ void Env::updateNeighborConnections(int id, bool isAdding){
             int neighborID = newRow * this->cols + newCol;
 
             if (isAdding) {
-                addEdge(id, neighborID, (abs(dir.first) == abs(dir.second)) ? 0 : 1);
+                addEdge(id, neighborID, (abs(dir.first) == abs(dir.second)) ? 2 : 1);
             } else {
                 removeEdge(id, neighborID);
             }
@@ -353,7 +356,6 @@ void Env::updateNeighborConnections(int id, bool isAdding){
         }
     }
     cells[id]->updateNeighbors(adjMatrix, *this);
-
 }
 
 
@@ -391,9 +393,10 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
 
     /*don't move robot if it wants to go to the same position*/
     if(nextCell == r->getCurrentCell()){
-        std::cout<<"stay there pal"<<std::endl;
+        std::cout<<"Stay there"<<std::endl;
         return -1;
     }
+
 
     std::shared_ptr<Cell> currentCell = r->getCurrentCell();
 
@@ -419,10 +422,6 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
 
 int Env::detectConflict(Robot& r1, Robot& r2){
     /*ROBOTS SOLVE THE CONFLICTS INTERNALLY*/
-    int conflictType = 0; /*assume no conflict exists*/
-    auto makeOrderedTuple = [](int id1, int id2, int type) {
-            return (id1 < id2) ? std::make_tuple(id1, id2, type) : std::make_tuple(id2, id1, type);
-    };
 
     /*collect the necessary info to check for conflicts*/
     std::shared_ptr<Cell> r1_curr = r1.getCurrentCell();
@@ -435,17 +434,21 @@ int Env::detectConflict(Robot& r1, Robot& r2){
     std::vector<std::shared_ptr<Cell>> r2_remNodes = r2.getPath();
     int r2_nFollowers = r2.getNFollowers();
 
+    if(!r1_nn && !r2_nn){
+        return 0;
+    }
+    
     /*OPPOSITE CONFLICT*/
-    if(r1_curr == r2_nn && r1_nn == r2_curr){
-        conflictType = 1;
+    if(r1_nn == r2_curr && r2_nn == r1_curr){
+        return 1;
     }
 
     /*INTERSECTION CONFLICT*/
     if(r1_nn == r2_nn){
-        conflictType = 2;
+        return 2;
     }
-    
-    return conflictType;
+
+    return 0;
 }
 
 void Env::remakePaths(){
@@ -489,7 +492,6 @@ void Env::randomizeRobots(){
 
         robots.emplace_back(std::make_shared<Robot>(randomCell, this));
         randomCell = cells[rand()%cells.size()];
-
 
         /*don't place a goal there if it is already a goal cell*/
         do{
@@ -698,10 +700,13 @@ void GridRenderer::draw(Env& env, float t) {
     DrawRectangleLinesEx(displayRect,5.0f, BLACK);
     DrawText(TextFormat("t = %.2f",t),displayRect.x+20,displayRect.y+20, 20, BLACK);
 
+    int finishedRobots = 0;
+
     for(auto& robot : robots){
         int rID = robot->getID();
         if(robot->atGoal()){
             robotState = " is at goal";
+            finishedRobots++;
         }
         else if(robot->isMoving()){
             robotState = " is moving";
@@ -712,4 +717,7 @@ void GridRenderer::draw(Env& env, float t) {
         DrawText(TextFormat("%d %s", rID, robotState.c_str()), 50,60+offsetY, 20, robotColors[rID]);
         offsetY+=30;
     }
+
+    DrawText(TextFormat("%d robots at goal", finishedRobots), 600,10,20, WHITE);
+    
 }
