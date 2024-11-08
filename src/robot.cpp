@@ -13,23 +13,29 @@ void Robot::takeAction(){
     double willIStop = dis(gen);
 
     if(willIStop<waitProbability){
-        this->stopRobot();
+        plannedAction = 0;
     }
-    else{
-        /*resume movement if the leader is not waiting*/
-        if(leader){
-            if(leader->isMoving()){
-                this->resumeRobot();
+    else if(noConflictDetected){ //THIS CONDITION IS HERE TO AVOID THE RNG OVERRIDING WAIT BEHAVIOUR OF CONFLICT SOLVING
+        plannedAction = 1;
+    }
+
+    if(noConflictDetected){
+        if(!path.empty()){
+            leader = path.front()->getObjID();
+
+            if(leader){
+                if(leader->plannedAction == 0){
+                    plannedAction = 0;
+                }
+                else if(leader->plannedAction && leader->step() == currentCell){
+                    plannedAction = 1;
+                    path.insert(path.begin(), giveWayNode);
+                }
             }
         }
-        else{
-            /*if the robot has no leader, resume movement*/
-            this->resumeRobot();
-        }
-
     }
 
-    if(moving){
+    if(plannedAction){
         if(!path.empty()){
             this->move(path.front());
         }
@@ -118,17 +124,20 @@ void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the rob
         updateDetectionArea(); /*update detection area after moving*/      
 
         if(!path.empty()){
+            if(currentCell == giveWayNode){
+                giveWayNode=nullptr;
+            }
             lastCell = *path.begin();
-            if(currentCell!=giveWayNode) pathHistory.push_back(currentCell);
+            pathHistory.push_back(currentCell);
             path.erase(path.begin());
         }
-    }    
+    }
 }
 
 void Robot::updateDetectionArea() {
+
     /*use BFS to get the communication range of the robot*/
     detectionArea.clear();
-    neighbors.clear();
 
     std::unordered_set<std::shared_ptr<Cell>> visited{currentCell}; /*mark current cell as visited so it is not included in the range*/
     std::deque<std::pair<std::shared_ptr<Cell>, int>> toVisit; /*cells to visit and determine distance*/
@@ -140,10 +149,6 @@ void Robot::updateDetectionArea() {
             toVisit.push_back({neighbor, initialCost});
             detectionArea.push_back(neighbor);
             visited.insert(neighbor);  /*mark neighbor as visited*/
-        }
-
-        if(neighbor->getObjID()){
-            neighbors.push_back(neighbor->getObjID());
         }
     }
 
@@ -163,106 +168,150 @@ void Robot::updateDetectionArea() {
                 detectionArea.push_back(n);
                 visited.insert(n);
             }
+        }
+    }
 
-            if(n->getObjID() && n!=currentCell){
-                neighbors.push_back(n->getObjID());
-            }
+}
+
+void Robot::getNeighbors(){
+    neighbors.clear();
+
+    for(auto& c:detectionArea){
+        if(c->getObjID() && c!=currentCell){
+            neighbors.push_back(c->getObjID());
         }
     }
 }
 
 bool Robot::findGiveWayNode(){
+
+    std::cout<<id<<" at ";
+    currentCell->logPos();
+    std::cout<<std::endl;
+
     /*scan surrounding cells of the current cell*/
-    for (const auto& neighbor : currentCell->getNeighbors()) {
+    for (const auto& cellNeighbor : currentCell->getNeighbors()) {
+        std::cout<<"Checking if ";
+        cellNeighbor->logPos();
+        std::cout<<" is a valid giveWayNode"<<std::endl;
+
         /*if there isn't a robot in the neighbor, use it as give way node*/
-        if(neighbor->getObjID()==nullptr && (std::find(path.begin(), path.end(), neighbor)==path.end())){
-            giveWayNode = neighbor;
-            break;
+        for(auto& n : neighbors){
+            if(n->step() != cellNeighbor){
+                if(cellNeighbor->getObjID()==nullptr && (std::find(path.begin(), path.end(), cellNeighbor)==path.end())){
+                    giveWayNode = cellNeighbor;
+                    break;
+                }
+            }
         }
     }
 
-    /*if a giveWayNode is found, return true*/
-    return (giveWayNode) ? true : false;
+    if(giveWayNode){
+        std::cout<<"Found ";
+        giveWayNode->logPos();
+        std::cout<<" as valid give way node for "<<id<<std::endl;
+
+        return true;
+    }
+    else{
+        return false;
+    }
 }
 
 void Robot::fetchNeighborInfo(){
-    /*check for robots in the detection range of the robot*/
+    /*check for conflicts with neighbors in the detection range*/
 
-    std::shared_ptr<Cell> rStep; /*immediate next node of neighbor robot*/
-    std::vector<std::shared_ptr<Cell>> remainingNodes; /*remaining nodes of neighbor robot rn*/
-    
-    for(auto n : neighbors){
-            if(n){
-                switch(environment->detectConflict(*this, *n)){
-                    case 0:
-                        /*NO CONFLICT IS DETECTED*/
-                        if(follower){
-                            /*if our follower has a longer path than ours, move out of the way*/
-                            if(follower->getPath().size() > path.size() && !follower->isGivingWay()){
-                                this->giveWay();
-                            }
-                        }
-                        // if(leader){
-                        //     if(!leader->isMoving() && !leader->atGoal()){
-                        //         std::cout<<id<<" waiting for leader "<<leader->getID()<<std::endl;
-                        //         this->stopRobot();
-                        //     }
-                        //     else if(leader->isMoving() && leader->step() == currentCell && !leader->isGivingWay()){
-                        //         //if the leader's next step is trying to move to our cell and it is not giving way to another robot, give way to it
-                        //         std::cout<<id<<" giving way to leader "<<leader->getID()<<std::endl;
-                        //         this->giveWay();
-                        //     }
-                        // }
-                        break;
-                    case 1:
-                        /*OPPOSITE CONFLICT*/
-                        solveOppositeConflict(n);
-                        break;
-                    case 2:
-                        /*INTERSECTION CONFLICT*/
-                        solveIntersectionConflict(n);
-                        break;
+    if(neighbors.size() == 0){
+        /*if there are no neighbors, there can't be a conflict*/
+        noConflictDetected = true;
+        return;
+    }
+
+    noConflictDetected = false; /*assume there is a conflict*/
+
+    for(auto& n:neighbors){
+        if(!n){
+            continue;
+        }
+        
+        std::cout<<"[DETECTING CONFLICT FOR] <"<<id<<","<<n->getID()<<">"<<std::endl;
+        switch(environment->detectConflict(*this, *n)){
+            case 0:
+                //std::cout<<"[NO CONFLICT BETWEEN] <"<<id<<","<<n->getID()<<">"<<std::endl;
+                plannedAction = 1;
+                noConflictDetected = true;
+
+                /*insert giveWayNode into path if my follower has a larger path*/
+                if(this->follower){
+                    if(follower->getPath().size() > path.size()){
+                        plannedAction = 1;
+                        this->giveWay();
+                    }
                 }
-            }
+
+                break;
+            
+            case 1:
+                std::cout<<"[OPPOSITE CONFLICT BETWEEN] <"<<id<<","<<n->getID()<<">"<<std::endl;
+                solveOppositeConflict(n);
+                noConflictDetected = false;
+                break;
+
+            case 2:
+                std::cout<<"[INTERSECTION CONFLICT BETWEEN] <"<<id<<","<<n->getID()<<">"<<std::endl;
+                solveIntersectionConflict(n);
+                noConflictDetected = false;
+                break;
+        }
     }
 }
 
 void Robot::findFollowers(){
+    /*assume zero followers at the start of the function*/
     numberFollowers = 0;
-    std::shared_ptr<Cell> nextCell = this->step();
+    for(auto& n:neighbors){
+        if(!n){
+            continue;
+        }
+        if(n->step() == currentCell || (n->path.size()>1 && n->path[1]==currentCell)){
+            /*if the next cell is the current cell or n_id(k+2) is the current cell it can be a follower and a neighbor requesting node*/
 
-    auto isInHistory = [this](std::shared_ptr<Cell> c)->bool{
-        return std::find(this->pathHistory.begin(), this->pathHistory.end(), c) != this->pathHistory.end();
-    };
-
-    for(auto& n : neighbors){
-        if(n){
-            if(n->step() == currentCell){ 
-                /*check if the robot's next cell is in my history of cells, then set as follower*/
-                if(!isInFollowerChain(n) && !n->getLeader()){
-                    /*if the robot is already in the chain of followers, don't set it as my follower*/
-                    n->setLeader(this);
-                    this->follower = n;
-                    numberFollowers++;
-                }
+            if(!isInFollowerChain(n) && !n->isGivingWay()){/*to avoid loops in follower chain, check if the robot is already following another robot*/
+                this->follower = n;
+                numberFollowers++;
             }
 
-            if(n == follower){                
-                /*if the follower has stopped being in the path history*/
-                if(n->step() != currentCell){
-                    numberFollowers--;
-                    follower = nullptr;
-                    n->setLeader(nullptr);
-                }
-            }
-
-            /*find if neighbor is requesting node and remove it if it is not requesting anymore*/
+            /*even if it is not a follower, it is requesting the node nonetheless*/
+            neighborsRequestingNode.push_back(n);
+        }
+        else if(n==follower){
             auto it = std::find(neighborsRequestingNode.begin(), neighborsRequestingNode.end(), n);
-            if (it != neighborsRequestingNode.end()) {
+            if(it != neighborsRequestingNode.end()){
                 neighborsRequestingNode.erase(it);
             }
-            else if(n->step() == currentCell){
-                neighborsRequestingNode.push_back(n);
+            this->follower = nullptr;
+        }
+        else{
+            auto it = std::find(neighborsRequestingNode.begin(), neighborsRequestingNode.end(), n);
+            if(it != neighborsRequestingNode.end()){
+                neighborsRequestingNode.erase(it);
+            }
+        }
+
+        if(n==follower){
+            if(n->isGivingWay()){
+                follower = nullptr;
+            }
+        }
+
+        /*while my follower has a follower, count that towards the total number of followers*/
+        if(n==follower){
+            Robot* tmp = this->follower;
+            std::unordered_set<Robot*> uniqueFollowers;
+            while(tmp && uniqueFollowers.count(tmp) == 0){
+                uniqueFollowers.insert(tmp);
+                numberFollowers++;
+                tmp = tmp->follower;
             }
         }
     }
@@ -304,9 +353,18 @@ Robot* Robot::determinePriority(Robot* r1, Robot* r2) {
     if (r1->getNFollowers() > r2->getNFollowers()) return r1;
     if (r2->getNFollowers() > r1->getNFollowers()) return r2;
 
+    std::cout<<"[CHECKING RULE 4]"<<std::endl;
+
+    bool r1_hasFreeNode = r1->findGiveWayNode();
+    bool r2_hasFreeNode = r2->findGiveWayNode();
+
     /* priority rule number 4: a robot having a free neighboring node is given priority */
-    if (r1->findGiveWayNode()) return r1;
-    if (r2->findGiveWayNode()) return r2;
+    if(r1_hasFreeNode && !r2_hasFreeNode){
+        return r1;
+    }
+    else if(!r1_hasFreeNode && r2_hasFreeNode){
+        return r2;
+    }
 
     /* priority rule number 5: the robot with the highest neighborsRequestingMyNode is given priority */
     if (r1->getNeighborsRequestingNode() > r2->getNeighborsRequestingNode()) return r1;
@@ -325,76 +383,104 @@ void Robot::solveIntersectionConflict(Robot* n){
 
     /*first, we must determine which robot has priority*/
     Robot* priorityRobot = determinePriority(this, n);
-    Robot* nonPriorityRobot = (priorityRobot == this) ? n : this;
+    Robot* lowPriorityRobot = (priorityRobot == n) ? this : n; /*if n has priority, then we are the lower priority robot*/
     
     std::vector<std::shared_ptr<Cell>> priorityPath = priorityRobot->getPath();
-    if(priorityPath.size()<3){
-        if(!priorityRobot->isGivingWay()){
-            std::cout<<priorityRobot->getID()<<" giving way because path is too short"<<std::endl;
-            priorityRobot->giveWay();
-        }
-        else nonPriorityRobot->stopRobot();
+
+    //TODO: COME UP WITH A SOLUTION FOR THIS
+    if(priorityPath.size()<2 && !priorityRobot->atGoal()){
+        priorityRobot->plannedAction = 0;
         return;
     }
-    Robot* obstacleRobot = priorityPath[2]->getObjID(); /*points to the robot occupying n(t+2) of high priority robot*/
+    else if(priorityRobot->atGoal()){
+        priorityRobot->giveWay();
+        std::cout<<id<<" [GIVING WAY AT GOAL]"<<std::endl;
+        return;
+    }
 
-    /*based on that, the robot of more priority checks if it's n(t+2) node is free
-    (a free node is one wich is not an obstacle or is not occupied by another robot in that time step)*/
-    if(!obstacleRobot){
-        for(auto& r : priorityRobot->neighborsRequestingNode){
-            /*robots requesting that node must wait*/
-            r->stopRobot();
+    Robot* aheadRobot = priorityPath[1]->getObjID(); /*robot at n(t+2) (next node is path[0], n(t+2) would be path[1])*/
+
+    if(aheadRobot){
+        std::cout<<"[AHEAD ROBOT FINDING GIVEWAYNODE] <"<<aheadRobot->getID()<<">"<<std::endl;
+        if(aheadRobot->findGiveWayNode()){
+            /*if it has a free neighboring node, move to it*/
+            std::cout<<aheadRobot->getID()<<" [FREEING NODE ";
+            priorityPath[1]->logPos();
+            std::cout<<" TO LET <"<<priorityRobot->getID()<<"> PASS]"<<std::endl;
+
+            aheadRobot->giveWay();
         }
-    }
-    else if(obstacleRobot->findGiveWayNode()){
-        obstacleRobot->giveWay();
-    }
-    else{
-        for(auto& n:obstacleRobot->neighbors){
-            if(n->findGiveWayNode()){
-                n->giveWay();
+        else{
+            std::cout<<"[AHEAD ROBOT ASKING NEIGHBORS TO MOVE]"<<std::endl;
+            for(auto& n : aheadRobot->neighbors){
+                /*if it doesn't find a free neighboring node, ask a neighbor to give way and move to it's node*/
+                if(n->findGiveWayNode()){
+                    n->giveWay();
+                    aheadRobot->path.insert(path.begin(), n->getCurrentCell());
+                    break;
+                }
             }
         }
     }
+    else{
+        for(auto& n : neighborsRequestingNode){
+            n->plannedAction = 0;
+        }
+    }
+
+    std::cout<<"[AFTER SOLVING INTERSECTION CONFLICT] ";
+    std::cout<<"Path for "<<priorityRobot->getID()<<std::endl;;
+    priorityRobot->logPath();
+
+    std::cout<<"Path for "<<lowPriorityRobot->getID()<<std::endl;
+    lowPriorityRobot->logPath();
+
+    std::cout<<"\n"<<std::endl;
+
 }
 
 void Robot::solveOppositeConflict(Robot* n){
     /*SOLVE SWAPPING CONFLICT BETWEEN TWO ROBOTS*/
-    
+
     Robot* priorityRobot = determinePriority(this, n);
-    Robot* lowPriorityRobot = (priorityRobot == this) ? n : this;
+    Robot* lowPriorityRobot = (priorityRobot == n) ? this : n;
 
     if(lowPriorityRobot->findGiveWayNode()){
-        std::cout<<lowPriorityRobot->getID()<<" in opposite conflict giving way to "<<priorityRobot->getID()<<std::endl;
         lowPriorityRobot->giveWay();
     }
     else if(priorityRobot->findGiveWayNode()){
-        std::cout<<lowPriorityRobot->getID()<<" in opposite conflict giving way to "<<priorityRobot->getID()<<std::endl;
         priorityRobot->giveWay();
     }
     else{
-        std::cout<<"need to retreat"<<std::endl;
+        if(lowPriorityRobot->follower){
+            /*retreat back to follower cell if no giveWayNode is available for either robot*/
+            lowPriorityRobot->follower->giveWay();
+            lowPriorityRobot->path.insert(lowPriorityRobot->path.begin(),lowPriorityRobot->follower->getCurrentCell());
+        }
     }
 
 }
 
 void Robot::giveWay(){
     if(findGiveWayNode()){
-        path.insert(path.begin(), currentCell);
-        path.insert(path.begin(), giveWayNode);
-    }
-}
+        std::cout<<"Path before: "<<std::endl;
+        logPath();
 
-void Robot::retreat(){
-    /*move to the last cell you've been at*/
-    if(lastCell && !isGivingWay()){
-        path.insert(path.begin(), lastCell);
+        std::cout<<"Inserting ";
+        giveWayNode->logPos();
+        std::cout<<" as giveWayNode, path looks like: "<<std::endl;
+
+        path.insert(path.begin(), giveWayNode);
+        logPath();
     }
 }
 
 /*return next step of the robot*/
 std::shared_ptr<Cell> Robot::step(){
-    return path.front();
+    if(!path.empty()){
+        return path.front();
+    }
+    return nullptr;
 }
 
 std::vector<std::shared_ptr<Cell>> Robot::getPath(){
@@ -443,18 +529,17 @@ void Robot::removeGoal(){
 }
 
 bool Robot::isMoving(){
-    return moving;
+    return plannedAction;
 }
 
 bool Robot::isGivingWay(){
-    auto isGivewayInPath = [this](std::shared_ptr<Cell> c)->bool{
-        return std::find(this->path.begin(), this->path.end(), this->giveWayNode) != this->path.end();
-    };
-    return isGivewayInPath(giveWayNode);
+    return currentCell == giveWayNode;
 }
 
 void Robot::logPath(){
-    std::cout<<"I'm "<<id<<" and my path is: "<<std::endl;
+    std::cout<<"I'm "<<id<<" at ";
+    currentCell->logPos();
+    std::cout<<" and my path is: "<<std::endl;
     for(auto& c: path){
         c->logPos();
         std::cout<<", ";
