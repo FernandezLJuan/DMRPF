@@ -13,7 +13,11 @@ enum class cellType {CELL_FREE, CELL_OBSTACLE, CELL_ROBOT, CELL_GOAL};
 class Cell{
 public:
 
-    Cell(int id, int x, int y) : id(id), x(x), y(y){};
+    Cell(int id, int x, int y) : id(id), x(x), y(y){ 
+        objectID = nullptr;
+        type = cellType::CELL_FREE;
+    
+    }
 
     /*NEIGHBOR RELATED*/
     void addNeighbor(std::shared_ptr<Cell>);
@@ -41,8 +45,7 @@ private:
     int x, y;
     
     std::vector<std::shared_ptr<Cell>> neighbors; /*neighbors to the cell in the grid graph*/
-    Robot* objectID = nullptr; /*object inside the cell, NULL if none*/
-
-    cellType type = cellType::CELL_FREE; /*type of the cell*/
+    Robot* objectID; /*object inside the cell, NULL if none*/
+    cellType type; /*type of the cell*/
 
 };
