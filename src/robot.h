@@ -12,8 +12,8 @@ class Robot
 public:
     Robot(std::shared_ptr<Cell> cell,Env* env): id(assignID()), environment(env), currentCell(cell){
         lastCell = currentCell;
-        path.push_back(currentCell);
-        pathHistory.push_back(currentCell);
+        /* path.push_back(currentCell);
+        pathHistory.push_back(currentCell); */
         this->updateDetectionArea();
 
         leader = nullptr;
@@ -21,6 +21,7 @@ public:
 
         plannedAction = 1;
         numberFollowers = 0;
+        noConflictDetected = false;
     }
 
     static void resetID(){
@@ -28,19 +29,20 @@ public:
     }
 
     void generatePath(); /*generate path between two positions*/
-
+    void reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>>, std::shared_ptr<Cell>);
     bool atGoal(); /*is the robot at goal?*/
     bool isMoving();
     bool isGivingWay();
+
     void stopRobot();
     void resumeRobot();
-    void reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>>, std::shared_ptr<Cell>);
     void findFollowers();
     bool isInFollowerChain(Robot*);
     void giveWay();
     void retreat();
     void solveIntersectionConflict(Robot*);
     void solveOppositeConflict(Robot*);
+    void getNeighbors();
 
     Robot* determinePriority(Robot*, Robot*);
 
@@ -79,6 +81,7 @@ private:
 
     int id;
     int numberFollowers;
+    bool noConflictDetected;
 
     bool moving = true; /*in case robot needs to be stopped before arriving at goal*/
     int plannedAction; /*0 wait, 1 move*/
