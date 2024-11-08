@@ -374,8 +374,8 @@ Robot* Robot::determinePriority(Robot* r1, Robot* r2) {
     if (r1->getPath().size() > r2->getPath().size()) return r1;
     if (r2->getPath().size() > r1->getPath().size()) return r2;
 
-    /* Default case, if none of the above rules apply */
-    return nullptr;
+    /* Default case, if none of the above rules apply return r1 */
+    return r1;
 }
 
 void Robot::solveIntersectionConflict(Robot* n){
@@ -461,14 +461,26 @@ void Robot::solveOppositeConflict(Robot* n){
 
 }
 
-void Robot::giveWay(){
-    if(findGiveWayNode()){
-        std::cout<<"Path before: "<<std::endl;
+void Robot::giveWay() {
+    if (findGiveWayNode()) {
+        std::cout << "Path before: " << std::endl;
         logPath();
 
-        std::cout<<"Inserting ";
+        std::vector<std::shared_ptr<Cell>> stepNeighbors;
+
+        if (!atGoal())
+            stepNeighbors = path.front()->getNeighbors();
+        else
+            stepNeighbors = currentCell->getNeighbors();
+
+        if (std::find(stepNeighbors.begin(), stepNeighbors.end(), giveWayNode) == stepNeighbors.end() || atGoal()) {
+            std::cout << "Inserting current cell so I can go back to my node" << std::endl;
+            path.insert(path.begin(), currentCell);
+        }
+
+        std::cout << "Inserting ";
         giveWayNode->logPos();
-        std::cout<<" as giveWayNode, path looks like: "<<std::endl;
+        std::cout << " as giveWayNode, path looks like: " << std::endl;
 
         path.insert(path.begin(), giveWayNode);
         logPath();
