@@ -412,7 +412,7 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
 
         currentCell->setObjID(nullptr);
         nextCell->setObjID(r);
-
+        
         return 0;
     }
     else{
