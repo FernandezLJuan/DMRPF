@@ -21,6 +21,13 @@ void Robot::takeAction(){
 
     if(noConflictDetected){
         if(!path.empty()){
+
+            if(!path.front()){
+                std::cout<<path.size()<<std::endl;
+                std::cout<<"WTF"<<std::endl;
+                environment->pauseSim();
+            }
+
             leader = path.front()->getObjID();
 
             if(leader){
@@ -124,9 +131,10 @@ void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the rob
         updateDetectionArea(); /*update detection area after moving*/      
 
         if(!path.empty()){
-            if(currentCell == giveWayNode){
-                giveWayNode=nullptr;
+            if(path.front() == giveWayNode){
+                giveWayNode = nullptr;
             }
+
             lastCell = *path.begin();
             pathHistory.push_back(currentCell);
             path.erase(path.begin());
@@ -473,10 +481,10 @@ void Robot::giveWay() {
         else
             stepNeighbors = currentCell->getNeighbors();
 
-        if (std::find(stepNeighbors.begin(), stepNeighbors.end(), giveWayNode) == stepNeighbors.end() || atGoal()) {
+        /* if (std::find(stepNeighbors.begin(), stepNeighbors.end(), giveWayNode) == stepNeighbors.end() || atGoal()) {
             std::cout << "Inserting current cell so I can go back to my node" << std::endl;
             path.insert(path.begin(), currentCell);
-        }
+        } */
 
         std::cout << "Inserting ";
         giveWayNode->logPos();
@@ -552,6 +560,9 @@ void Robot::logPath(){
     std::cout<<"I'm "<<id<<" at ";
     currentCell->logPos();
     std::cout<<" and my path is: "<<std::endl;
+
+    std::cout<<"path size: "<<path.size()<<std::endl;
+
     for(auto& c: path){
         c->logPos();
         std::cout<<", ";
