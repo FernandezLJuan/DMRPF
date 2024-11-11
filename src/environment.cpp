@@ -65,6 +65,12 @@ bool Env::onClick(int id){
         }
     }
 
+    if(IsKeyPressed(KEY_P)){
+        if(selectedRobot){
+            selectedRobot->logPath();
+        }
+    }
+
     if(IsKeyPressed(KEY_R)){
         remakePaths();
     }
@@ -144,6 +150,7 @@ void Env::updateEnvironment(){
     for(auto& r : robots){
         if(r){
             r->updateDetectionArea();
+            r->getNeighbors();
             r->findFollowers();
             r->fetchNeighborInfo();
             r->takeAction();
@@ -430,6 +437,11 @@ int Env::detectConflict(Robot& r1, Robot& r2){
     std::shared_ptr<Cell> r2_nn = r2.step();
     std::vector<std::shared_ptr<Cell>> r2_remNodes = r2.getPath();
     int r2_nFollowers = r2.getNFollowers();
+
+    /*if both robots are at goal, no conflict is detected*/
+    if(!r1_nn && !r2_nn){
+        return 0;
+    }
 
     /*OPPOSITE CONFLICT*/
     if(r1_curr == r2_nn && r1_nn == r2_curr){
