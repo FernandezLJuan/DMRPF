@@ -18,6 +18,9 @@ public:
 
         leader = nullptr;
         follower = nullptr;
+
+        plannedAction = 1;
+        noConflictDetected = true;
     }
 
     static void resetID(){
@@ -36,6 +39,7 @@ public:
     bool isInFollowerChain(Robot*);
     void giveWay();
     void retreat();
+    void getNeighbors();
     void solveIntersectionConflict(Robot*);
     void solveOppositeConflict(Robot*);
 
@@ -43,6 +47,7 @@ public:
 
     void updateDetectionArea();
     bool findGiveWayNode();
+    bool isInPath(std::shared_ptr<Cell>);
     void takeAction();
     std::shared_ptr<Cell> step();/*next step in path*/
 
@@ -63,6 +68,7 @@ public:
     void removeGoal();
     void setLeader(Robot*);
     void setFollower(Robot*);
+    void logPath();
     Robot* getLeader();
 
 private:
@@ -75,8 +81,8 @@ private:
 
     int id;
     int numberFollowers;
-
-    bool moving = true; /*in case robot needs to be stopped before arriving at goal*/
+    int plannedAction;
+    bool noConflictDetected;
 
     void move(std::shared_ptr<Cell>); /*move to a new position, only one cell at a time*/
     void followPath(); /*follow generated path*/
