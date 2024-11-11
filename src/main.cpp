@@ -9,7 +9,7 @@
 
 float totalTime = 0.0f;
 float timeElapsed = 0.0f;
-float timeStep = 0.2f;
+float timeStep = 0.1f;
 
 void loadSettings(std::string path){
 /*load settings from file configuration at path*/
