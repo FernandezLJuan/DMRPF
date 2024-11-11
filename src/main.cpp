@@ -119,7 +119,7 @@ int main(int argc, char* argv[]){
             grid->onClick(mouseID);
 
             if(timeElapsed>=timeStep){
-                grid->updateEnvironment();
+                grid->updateEnvironment(totalTime);
                 timeElapsed = 0.0;
             }
 
