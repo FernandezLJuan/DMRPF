@@ -43,7 +43,7 @@ public:
     bool onClick(int);
 
     /*ENVIRONMENT MODIFICATION*/
-    void updateEnvironment(); /*updates robot positions, cell neighbors and spawns random obstacles*/
+    void updateEnvironment(float); /*updates robot positions, cell neighbors and spawns random obstacles*/
     void addObstacle(int);
     void removeObstacle(int);
     void addEdge(int, int, int); /*add connection between two cells in the graph*/

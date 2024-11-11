@@ -132,7 +132,7 @@ bool Env::onClick(int id){
 
 
 /*ENVIRONMENT MODIFICATION*/
-void Env::updateEnvironment(){
+void Env::updateEnvironment(float t){
     /*if all robots are at goal, pause the simulation*/
     if(robotsAtGoal.size() == nRobots && nRobots!=0){
         std::cout<<"All robots at goal, pausing simulation"<<std::endl;
