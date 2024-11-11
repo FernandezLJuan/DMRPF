@@ -120,12 +120,18 @@ void Robot::move(std::shared_ptr<Cell> newPos){ /*change the position of the rob
 
     std::array<int, 2> eDims = environment->getDims();
 
+    std::vector<std::shared_ptr<Cell>> something = currentCell->getNeighbors();
+
+    if(std::find(something.begin(), something.end(), newPos) == something.end()){
+        std::cout<<id<<" [CANNOT MOVE TO NEXT CELL] "<<std::endl;
+    }
+
     if(!(environment->moveRobot(this, newPos)<0)){
         currentCell = environment->getCellByID(newPos->getID());
 
         if(!path.empty()){
             lastCell = *path.begin();
-            if(currentCell!=giveWayNode) pathHistory.push_back(currentCell);
+            pathHistory.push_back(currentCell);
             path.erase(path.begin());
         }
     }    
@@ -180,17 +186,17 @@ void Robot::getNeighbors(){
 
 bool Robot::findGiveWayNode(){
 
-    if(giveWayNode){
-        std::cout<<"I already have a giveWayNode"<<std::endl;
-        return false;
-    }
-
     /*scan surrounding cells of the current cell*/
-    for (const auto& neighbor : currentCell->getNeighbors()) {
+    for (const auto& cellNeighbor : currentCell->getNeighbors()) {
         /*if there isn't a robot in the neighbor, use it as give way node*/
-        if(neighbor->getObjID()==nullptr && !isInPath(neighbor)){
-            giveWayNode = neighbor;
-            break;
+
+        for(auto& rn : neighbors){
+            if(cellNeighbor != rn->step()){    
+                if(cellNeighbor->getObjID()==nullptr && !isInPath(cellNeighbor)){
+                    giveWayNode = cellNeighbor;
+                    break;
+                }
+            }
         }
     }
 
@@ -235,6 +241,7 @@ void Robot::fetchNeighborInfo(){
                 break;
             case 2:
                 /*INTERSECTION CONFLICT*/
+                std::cout<<"[INTERSECTION CONFLICT BETWEEN] <"<<id<<" AND "<<n->getID()<<">"<<std::endl;
                 solveIntersectionConflict(n);
                 break;
         }
@@ -242,42 +249,50 @@ void Robot::fetchNeighborInfo(){
 }
 
 void Robot::findFollowers(){
-    numberFollowers = 0;
+    neighborsRequestingNode.clear(); /*reset neighbors requesting node*/
+    numberFollowers = 0; /*assume there are no followers before searching for them*/
+    follower = nullptr;
+
     std::shared_ptr<Cell> nextCell = this->step();
 
     auto isInHistory = [this](std::shared_ptr<Cell> c)->bool{
         return std::find(this->pathHistory.begin(), this->pathHistory.end(), c) != this->pathHistory.end();
     };
 
+    /*for any neighboring robots*/
     for(auto& n : neighbors){
-        if(n){
-            if(isInHistory(n->step()) && isInHistory(n->getCurrentCell())){ 
-                /*check if the robot's next cell is in my history of cells, then set as follower*/
-                if(!isInFollowerChain(n) && !n->getLeader()){
-                    /*if the robot is already in the chain of followers, don't set it as my follower*/
-                    n->setLeader(this);
-                    this->follower = n;
-                    numberFollowers++;
-                }
-            }
+        if(!n){
+            continue;
+        }
 
-            if(n == follower){                
-                /*if the follower has stopped being in the path history*/
-                if(!isInHistory(n->getCurrentCell()) || !isInHistory(n->step())){
-                    numberFollowers--;
-                    follower = nullptr;
-                    n->setLeader(nullptr);
-                }
+        if(n->step() == currentCell){ 
+            /*check if the robot's next cell is in my history of cells, then set as follower*/
+            if(!isInFollowerChain(n)){
+                /*if the robot is already in the chain of followers, don't set it as my follower*/
+                this->follower = n;
+                numberFollowers++;
             }
+        }
 
-            /*find if neighbor is requesting node and remove it if it is not requesting anymore*/
-            auto it = std::find(neighborsRequestingNode.begin(), neighborsRequestingNode.end(), n);
-            if (it != neighborsRequestingNode.end()) {
-                neighborsRequestingNode.erase(it);
+        if(n == follower){
+            Robot* tmp = follower;
+            std::unordered_set<Robot*> visited;
+
+            while(tmp){
+                if(visited.find(tmp) != visited.end()){
+                    break;
+                }
+                numberFollowers++;
+                visited.insert(tmp);
+                tmp = tmp->follower;
             }
-            else if(n->step() == currentCell){
-                neighborsRequestingNode.push_back(n);
-            }
+        }
+
+        auto it = std::find(neighborsRequestingNode.begin(), neighborsRequestingNode.end(), n);
+
+        /*check if the robot's next cell or n(t+2) cell are my node*/
+        if(n->step() == currentCell || (n->getPath().size()>2 && n->getPath()[1] == currentCell)){
+            neighborsRequestingNode.push_back(n);
         }
     }
 }
@@ -355,28 +370,29 @@ void Robot::solveIntersectionConflict(Robot* n){
         return;
     }
 
-    Robot* obstacleRobot = priorityPath[1]->getObjID(); /*points to the robot occupying n(t+2) of high priority robot*/
+    Robot* aheadRobot = priorityPath[1]->getObjID(); /*points to the robot occupying n(t+2) of high priority robot*/
 
     /*based on that, the robot of more priority checks if it's n(t+2) node is free
     (a free node is one wich is not an obstacle or is not occupied by another robot in that time step)*/
-    if(!priorityPath[1]->isObstacle() && !obstacleRobot){
-        /*if the node is free, the low priority robot waits*/
-        nonPriorityRobot->stopRobot();
-    }
-    else if(obstacleRobot){
-        if(obstacleRobot->findGiveWayNode() && !obstacleRobot->isGivingWay()){
-            std::cout<<obstacleRobot->getID()<<" moving out of the way on an intersection conflict with "<<priorityRobot->getID()<<std::endl;
-            obstacleRobot->giveWay();
+    if(!priorityPath[1]->isObstacle() && !aheadRobot){
+        /*if the node is free, the low priority robot and all robots requesting the node stop*/
+        for(auto r : priorityRobot->neighborsRequestingNode){
+            r->stopRobot();
+            r->noConflictDetected = false;
         }
-        else if(obstacleRobot->isGivingWay()){
-            obstacleRobot->stopRobot();
+    }
+    else if(aheadRobot){
+        if(aheadRobot->findGiveWayNode()){
+            std::cout<<aheadRobot->getID()<<" moving out of the way on an intersection conflict with "<<priorityRobot->getID()<<std::endl;
+            aheadRobot->giveWay();
         }
         else{
             /*if no neighboring node is found, ask neighbor robot to move out of the way*/
-            for(auto& n : obstacleRobot->neighbors){
+            for(auto& n : aheadRobot->neighbors){
                 if(n->findGiveWayNode()){
-                    std::cout<<"neighbor "<<n->getID()<<" asked to give way for robot "<<obstacleRobot->getID()<<std::endl;
+                    std::cout<<"neighbor "<<n->getID()<<" asked to give way for robot "<<aheadRobot->getID()<<std::endl;
                     n->giveWay();
+                    aheadRobot->path.insert(path.begin(), n->getCurrentCell());
                     break;
                 }
             }
@@ -416,15 +432,25 @@ void Robot::giveWay(){
         std::vector<std::shared_ptr<Cell>> currNeighbors = this->step()->getNeighbors();
 
         auto isReachable = [this, &currNeighbors]() -> bool {
-            return std::find(currNeighbors.begin(), currNeighbors.end(), giveWayNode) != currNeighbors.end();
+            return std::find(currNeighbors.begin(), currNeighbors.end(), giveWayNode) == currNeighbors.end();
         };
 
         /*if we cant reach next cell in path from givewaynode, return to current cell after giving way*/
         if((!isReachable() || atGoal()) && !isInPath(currentCell)){
+            giveWayNode->logPos();
+            std::cout<<" not reachable from ";
+            this->step()->logPos();
+            std::cout<<" inserting current cell into path"<<std::endl;
+
             path.insert(path.begin(), currentCell);
+            std::cout<<"path after inserting current cell:"<<std::endl;
+            logPath();
         }
 
         path.insert(path.begin(), giveWayNode);
+
+        std::cout<<"path after inserting give way node: "<<std::endl;
+        logPath();
     }
 }
 
