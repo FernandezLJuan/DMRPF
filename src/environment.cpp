@@ -393,10 +393,10 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
     }
 
     /*don't move robot if it wants to go to the same position*/
-    if(nextCell == r->getCurrentCell()){
+    /* if(nextCell == r->getCurrentCell()){
         std::cout<<"stay there pal"<<std::endl;
         return -1;
-    }
+    } */
 
     std::shared_ptr<Cell> currentCell = r->getCurrentCell();
 
