@@ -41,6 +41,11 @@ void Robot::takeAction(){
             this->move(path.front());
         }
     }
+
+    if(isGivingWay()){
+        giveWayNode = nullptr;
+        givingWay = false;
+    }
 }
 
 void Robot::reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>> recordedPath, std::shared_ptr<Cell> cell){
@@ -185,15 +190,18 @@ void Robot::getNeighbors(){
 }
 
 bool Robot::findGiveWayNode(){
+    /*scan neighbors of current cell and look for a free node to move into*/
 
-    /*scan surrounding cells of the current cell*/
+    /*assume there is no free neighboring node*/
+    freeNeighboringNode = nullptr;
+
     for (const auto& cellNeighbor : currentCell->getNeighbors()) {
         /*if there isn't a robot in the neighbor, use it as give way node*/
 
         for(auto& rn : neighbors){
             if(cellNeighbor != rn->step()){    
                 if(cellNeighbor->getObjID()==nullptr && !isInPath(cellNeighbor)){
-                    giveWayNode = cellNeighbor;
+                    freeNeighboringNode = cellNeighbor;
                     break;
                 }
             }
@@ -201,7 +209,7 @@ bool Robot::findGiveWayNode(){
     }
 
     /*if a giveWayNode is found, return true*/
-    return (giveWayNode) ? true : false;
+    return (freeNeighboringNode) ? true : false;
 }
 
 void Robot::fetchNeighborInfo(){
@@ -427,30 +435,24 @@ void Robot::solveOppositeConflict(Robot* n){
 }
 
 void Robot::giveWay(){
+
     if(findGiveWayNode()){
 
-        std::vector<std::shared_ptr<Cell>> currNeighbors = this->step()->getNeighbors();
+        giveWayNode = freeNeighboringNode;
 
-        auto isReachable = [this, &currNeighbors]() -> bool {
-            return std::find(currNeighbors.begin(), currNeighbors.end(), giveWayNode) == currNeighbors.end();
+        std::vector<std::shared_ptr<Cell>> nextNeighbors = this->step()->getNeighbors();
+
+        auto isReachable = [this, &nextNeighbors]() -> bool {
+            return std::find(nextNeighbors.begin(), nextNeighbors.end(), giveWayNode) != nextNeighbors.end();
         };
 
         /*if we cant reach next cell in path from givewaynode, return to current cell after giving way*/
         if((!isReachable() || atGoal()) && !isInPath(currentCell)){
-            giveWayNode->logPos();
-            std::cout<<" not reachable from ";
-            this->step()->logPos();
-            std::cout<<" inserting current cell into path"<<std::endl;
-
             path.insert(path.begin(), currentCell);
-            std::cout<<"path after inserting current cell:"<<std::endl;
-            logPath();
         }
 
         path.insert(path.begin(), giveWayNode);
-
-        std::cout<<"path after inserting give way node: "<<std::endl;
-        logPath();
+        givingWay = true;
     }
 }
 
@@ -518,7 +520,7 @@ bool Robot::isMoving(){
 }
 
 bool Robot::isGivingWay(){
-    return currentCell == giveWayNode;
+    return givingWay;
 }
 
 int Robot::getID(){
