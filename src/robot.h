@@ -19,6 +19,11 @@ public:
         leader = nullptr;
         follower = nullptr;
 
+        giveWayNode = nullptr;
+        freeNeighboringNode = nullptr;
+
+        givingWay = false;
+
         plannedAction = 1;
         noConflictDetected = true;
     }
@@ -83,6 +88,7 @@ private:
     int numberFollowers;
     int plannedAction;
     bool noConflictDetected;
+    bool givingWay;
 
     void move(std::shared_ptr<Cell>); /*move to a new position, only one cell at a time*/
     void followPath(); /*follow generated path*/
@@ -92,6 +98,7 @@ private:
 
     std::shared_ptr<Cell> goal; /*where does the robot want to move to*/
     std::shared_ptr<Cell> giveWayNode; /*node to move back and give way to a robot of more priority*/
+    std::shared_ptr<Cell> freeNeighboringNode;
 
     Env* environment; /*environment the robot is on*/
 
