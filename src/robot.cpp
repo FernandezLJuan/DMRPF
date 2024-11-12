@@ -195,16 +195,28 @@ bool Robot::findGiveWayNode(){
     /*assume there is no free neighboring node*/
     freeNeighboringNode = nullptr;
 
-    for (const auto& cellNeighbor : currentCell->getNeighbors()) {
-        /*if there isn't a robot in the neighbor, use it as give way node*/
+    auto isInHistory = [this](std::shared_ptr<Cell> c){
+        return std::find(pathHistory.begin(), pathHistory.end(), c) != pathHistory.end();
+    };
 
-        for(auto& rn : neighbors){
-            if(cellNeighbor != rn->step()){    
-                if(cellNeighbor->getObjID()==nullptr && !isInPath(cellNeighbor)){
-                    freeNeighboringNode = cellNeighbor;
+    for (const auto& cellNeighbor : currentCell->getNeighbors()) {
+        if (cellNeighbor->getObjID() != nullptr || isInPath(cellNeighbor) || isInHistory(cellNeighbor)) {
+            continue;
+        }
+
+        bool isFreeNode = true;
+        if (!neighbors.empty()) {
+            for (const auto& rn : neighbors) {
+                if (cellNeighbor == rn->step()) {
+                    isFreeNode = false;
                     break;
                 }
             }
+        }
+
+        if (isFreeNode) {
+            freeNeighboringNode = cellNeighbor;
+            break;
         }
     }
 
@@ -366,7 +378,7 @@ void Robot::solveIntersectionConflict(Robot* n){
 
     /*first, we must determine which robot has priority*/
     Robot* priorityRobot = determinePriority(this, n);
-    Robot* nonPriorityRobot = (priorityRobot == this) ? n : this;
+    Robot* lowPriorityRobot = (priorityRobot == this) ? n : this;
     
     std::vector<std::shared_ptr<Cell>> priorityPath = priorityRobot->getPath();
     if(priorityPath.size()<2 && !priorityRobot->atGoal()){
@@ -382,16 +394,8 @@ void Robot::solveIntersectionConflict(Robot* n){
 
     /*based on that, the robot of more priority checks if it's n(t+2) node is free
     (a free node is one wich is not an obstacle or is not occupied by another robot in that time step)*/
-    if(!priorityPath[1]->isObstacle() && !aheadRobot){
-        /*if the node is free, the low priority robot and all robots requesting the node stop*/
-        for(auto r : priorityRobot->neighborsRequestingNode){
-            r->stopRobot();
-            r->noConflictDetected = false;
-        }
-    }
-    else if(aheadRobot){
+    if(aheadRobot){
         if(aheadRobot->findGiveWayNode()){
-            std::cout<<aheadRobot->getID()<<" moving out of the way on an intersection conflict with "<<priorityRobot->getID()<<std::endl;
             aheadRobot->giveWay();
         }
         else{
@@ -406,6 +410,14 @@ void Robot::solveIntersectionConflict(Robot* n){
             }
         }
     }
+    else{
+        lowPriorityRobot->stopRobot();
+        /*if the node is free, the low priority robot and all robots requesting the node stop*/
+        for(auto r : priorityRobot->neighborsRequestingNode){
+            r->stopRobot();
+            r->noConflictDetected = false;
+        }
+    }
 }
 
 void Robot::solveOppositeConflict(Robot* n){
@@ -415,15 +427,12 @@ void Robot::solveOppositeConflict(Robot* n){
     Robot* lowPriorityRobot = (priorityRobot == this) ? n : this;
 
     if(lowPriorityRobot->findGiveWayNode()){
-        std::cout<<lowPriorityRobot->getID()<<" in opposite conflict giving way to "<<priorityRobot->getID()<<std::endl;
         lowPriorityRobot->giveWay();
     }
     else if(priorityRobot->findGiveWayNode()){
-        std::cout<<lowPriorityRobot->getID()<<" in opposite conflict giving way to "<<priorityRobot->getID()<<std::endl;
         priorityRobot->giveWay();
     }
     else{
-        std::cout<<lowPriorityRobot->getID()<<" retreating to follower cell"<<std::endl;
         if(follower){
             if(follower->findGiveWayNode()){
                 follower->giveWay();
@@ -435,6 +444,10 @@ void Robot::solveOppositeConflict(Robot* n){
 }
 
 void Robot::giveWay(){
+
+    if(isGivingWay()){
+        return;
+    }
 
     if(findGiveWayNode()){
 
@@ -495,6 +508,9 @@ void Robot::setGoal(std::shared_ptr<Cell> goalPos){
     if(goalPos != currentCell){
         environment->addGoal(goalPos->getID());
     }
+    std::cout<<"I'm robot "<<id<<" with goal at: ";
+    goal->logPos();
+    std::cout<<std::endl;
     this->generatePath();
 }
 
