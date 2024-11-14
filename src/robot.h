@@ -23,9 +23,12 @@ public:
         freeNeighboringNode = nullptr;
 
         givingWay = false;
+        done = false;
 
         plannedAction = 1;
         noConflictDetected = true;
+        
+        ruleCount = {0,0,0,0,0,0};
     }
 
     static void resetID(){
@@ -62,11 +65,13 @@ public:
     int getID();
     int getNFollowers();
     int getNeighborsRequestingNode(); /*return how many neighbors are requesting this node*/
+    size_t relativePathSize(); /*returns the relation between the first generated path and the path history*/
     std::array<int, 2> getPos(); /*get x,y position on the grid (is it redundant?)*/
     std::shared_ptr<Cell> getCurrentCell();
     std::vector<std::shared_ptr<Cell>> getArea(); /*retyurn detection area, used for drawing*/
     std::shared_ptr<Cell> getGoal();
     std::vector<std::shared_ptr<Cell>> getPath();
+    std::array<int, 6> getRuleCount();
     void setPos(std::shared_ptr<Cell>);
     void logPos();
     void setGoal(std::shared_ptr<Cell>);/*set goal at x,y position*/
@@ -89,6 +94,9 @@ private:
     int plannedAction;
     bool noConflictDetected;
     bool givingWay;
+    bool done;
+
+    size_t pathLength;
 
     void move(std::shared_ptr<Cell>); /*move to a new position, only one cell at a time*/
     void followPath(); /*follow generated path*/
@@ -109,6 +117,7 @@ private:
     std::vector<std::shared_ptr<Cell>> detectionArea; /*cells in which the robot can detect robots*/
     std::vector<Robot*> neighborsRequestingNode; /*robots requesting the current node*/
     std::vector<Robot*> neighbors; /*robots inside detection area*/
+    std::array<int, 6> ruleCount; /*counts, locally, how many times each rule has been triggered*/
 
     Robot* leader; /*pointer to leader of the chain*/
     Robot* follower; /*pointer to the nearest follower*/
