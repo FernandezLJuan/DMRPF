@@ -42,9 +42,7 @@ void Env::resumeSim(){
     running = true;
 }
 
-bool Env::onClick(int id){
-
-    bool success = true;
+void Env::onClick(int id){
 
     if(IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)){
         if(IsKeyDown(KEY_S)){
@@ -91,7 +89,7 @@ bool Env::onClick(int id){
     }
 
     if(id<0 || id>cells.size()){
-        return false;
+        return;
     }
 
     if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)){
@@ -125,17 +123,33 @@ bool Env::onClick(int id){
 
         selectedRobot = R.get();
     }
-
-    return true;
-
 }
 
 
 /*ENVIRONMENT MODIFICATION*/
 void Env::updateEnvironment(float t){
+
+    detectedConflicts.clear();
+
+    std::cout<<"Updating for time: "<<t<<std::endl;
     /*if all robots are at goal, pause the simulation*/
-    if(robotsAtGoal.size() == nRobots && nRobots!=0){
+    if(robotsAtGoal.size() == robots.size() && robots.size()!=0){
         std::cout<<"All robots at goal, pausing simulation"<<std::endl;
+
+        auto lastElement = robotsAtGoal.rbegin();
+        auto slowestRobot = lastElement->first;
+        float highestTime = lastElement->second;
+
+        std::cout<<"Slowest robot: "<<slowestRobot->getID()<<" with time: "<<highestTime<<std::endl;
+
+        for(const auto& r : robots){
+            std::cout<<"Relative path size of robot "<<r->getID()<<" = "<<r->relativePathSize()<<std::endl;
+            std::array<int, 6> ruleCount = r->getRuleCount();
+            for(int i=0; i<6; i++){
+                std::cout<<"Robot "<<r->getID()<<" activated rule "<<i<<" "<<ruleCount[i]<<" times"<<std::endl;
+            }
+        }
+
         this->pauseSim();
     }
 
@@ -148,20 +162,22 @@ void Env::updateEnvironment(float t){
 
     /*all robots in the environment shall take an action, be it wait or move*/
     for(auto& r : robots){
-        if(r){
-            r->updateDetectionArea();
-            r->getNeighbors();
-            r->findFollowers();
-            r->fetchNeighborInfo();
-            r->takeAction();
-            if(r->atGoal()){
-                robotsAtGoal.insert(r);
-            }
+        if(!r){
+            continue;
+        }
 
-            /*if a robot is saved as a robot at goal but is no longer at his goal, remove it from the set*/
-            if(robotsAtGoal.find(r) != robotsAtGoal.end() && !r->atGoal()){
-                robotsAtGoal.erase(r);
-            }
+        r->updateDetectionArea();
+        r->getNeighbors();
+        r->findFollowers();
+        r->fetchNeighborInfo();
+        r->takeAction();
+        if(r->atGoal()){
+            robotsAtGoal[r] = t;
+        }
+
+        /*if a robot is saved as a robot at goal but is no longer at his goal, remove it from the set*/
+        if(robotsAtGoal.find(r) != robotsAtGoal.end() && !r->atGoal()){
+            robotsAtGoal.erase(r);
         }
     }
 }
@@ -359,7 +375,6 @@ void Env::updateNeighborConnections(int id, bool isAdding){
 
 }
 
-
 /*ROBOT MANIPULATION FUNCTIONS*/
 int Env::placeRobot(Robot* r){
     
@@ -423,24 +438,31 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
 int Env::detectConflict(Robot& r1, Robot& r2){
     /*ROBOTS SOLVE THE CONFLICTS INTERNALLY*/
     int conflictType = 0; /*assume no conflict exists*/
-    auto makeOrderedTuple = [](int id1, int id2, int type) {
-            return (id1 < id2) ? std::make_tuple(id1, id2, type) : std::make_tuple(id2, id1, type);
+
+    auto makeOrderedTuple = [this](int id1,int id2, int conflict) -> std::tuple<int,int,int>{
+        return (id1 < id2) ? std::make_tuple(id1,id2,conflict) : std::make_tuple(id2,id1,conflict);
     };
+
+    /*if there has been a conflict detected for these two robots, return the result*/
+    for (int cType = 0; cType <= 2; ++cType) {
+        if (detectedConflicts.find(makeOrderedTuple(r1.getID(), r2.getID(), cType)) != detectedConflicts.end()) {
+            std::cout<<"Already detected conflict for robots <"<<r1.getID()<<" AND "<<r2.getID()<<">"<<std::endl;
+            return cType;
+        }
+    }
 
     /*collect the necessary info to check for conflicts*/
     std::shared_ptr<Cell> r1_curr = r1.getCurrentCell();
     std::shared_ptr<Cell> r1_nn = r1.step();
     std::vector<std::shared_ptr<Cell>> r1_remNodes = r1.getPath();
-    int r1_nFollowers = r1.getNFollowers();
 
     std::shared_ptr<Cell> r2_curr = r2.getCurrentCell();
     std::shared_ptr<Cell> r2_nn = r2.step();
     std::vector<std::shared_ptr<Cell>> r2_remNodes = r2.getPath();
-    int r2_nFollowers = r2.getNFollowers();
 
     /*if both robots are at goal, no conflict is detected*/
     if(!r1_nn && !r2_nn){
-        return 0;
+        conflictType = 0;
     }
 
     /*OPPOSITE CONFLICT*/
@@ -449,16 +471,21 @@ int Env::detectConflict(Robot& r1, Robot& r2){
     }
 
     /*INTERSECTION CONFLICT*/
-    if(r1_nn == r2_nn){
+    if(r1_nn == r2_nn && r1_nn && r2_nn){
         conflictType = 2;
     }
-    
+
+    detectedConflicts.insert(makeOrderedTuple(r1.getID(), r2.getID(),conflictType));
+
     return conflictType;
 }
 
 void Env::remakePaths(){
     this->pauseSim();
     for(auto& r : robots){
+        if(r->atGoal()){
+            continue;
+        }
         r->generatePath();
     }
 }
@@ -479,8 +506,6 @@ void Env::removeGoal(int id){
 void Env::randomizeRobots(){
     
     std::shared_ptr<Cell> randomCell;
-    std::array<int, 2> rPos = {0,0};
-    Vector2 rGoal;
     int placedRobots = 0;
 
     srand(time(NULL));
@@ -642,7 +667,6 @@ void Env::dump_map(){
     mapFile.close();
 
 }
-
 
 /* DRAWING THE ENVIRONMENT */
 void GridRenderer::draw(Env& env, float t) {
