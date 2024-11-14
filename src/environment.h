@@ -1,7 +1,5 @@
 #pragma once
 
-//TODO: MOVE RECTANGLE TO DRAWER CLASS AND SET DIMENSIONS BY env->cellDims()
-
 #include <array>
 #include <ctime>
 #include <memory>
@@ -11,6 +9,7 @@
 #include <raylib.h>
 #include <tuple>
 #include <set>
+#include <map>
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -40,7 +39,7 @@ public:
 
     void pauseSim();
     void resumeSim();
-    bool onClick(int);
+    void onClick(int);
 
     /*ENVIRONMENT MODIFICATION*/
     void updateEnvironment(float); /*updates robot positions, cell neighbors and spawns random obstacles*/
@@ -102,12 +101,10 @@ private:
     
     std::vector<std::shared_ptr<Cell>> cells; /*each cell on the environment*/
     std::vector<std::shared_ptr<Robot>> robots; /*each robot on the environment*/
-    std::set<std::shared_ptr<Robot>> robotsAtGoal; /*each robot on the environment*/
+    std::map<std::shared_ptr<Robot>, float> robotsAtGoal; /*each robot on the environment*/
     Robot* selectedRobot = nullptr;
 
-    std::set<std::tuple<int,int,int>> checkedConflicts; 
-    /*pairs of robots for which conflicts have been checked, this way we don't check the same robots over and over*/
-
+    std::set<std::tuple<int,int,int>> detectedConflicts; /*stores the ids of the robots for which we have already checked a conflict in this t_step*/
 };
 
 class GridRenderer{
