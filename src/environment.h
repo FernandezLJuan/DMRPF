@@ -54,7 +54,7 @@ public:
 
     /*ROBOT MANAGEMENT FUNCTIONS*/
     int placeRobot(Robot*); /*place robot in the environment*/
-    int moveRobot(Robot* , std::shared_ptr<Cell>); /*update robot position*/
+    int moveRobot(Robot* , Cell*); /*update robot position*/
     int detectConflict(Robot&, Robot&); /*return the type of conflict it has detected*/
     void remakePaths();
     void addGoal(int);
@@ -65,10 +65,10 @@ public:
     std::array<int, 2> getDims();
     std::array<int, 2> cellDims();
     std::array<int, 2> origin();
-    std::shared_ptr<Cell> getCellByPos(int , int );
-    std::shared_ptr<Cell> getCellByID(int );
-    std::vector<std::shared_ptr<Cell>> getCells();
-    std::vector<std::shared_ptr<Robot>> getRobots();
+    Cell* getCellByPos(int , int );
+    Cell* getCellByID(int );
+    std::vector<std::unique_ptr<Cell>>& getCells();
+    std::vector<std::unique_ptr<Robot>>& getRobots();
 
     /*other environment info*/
     bool isRunning();
@@ -99,9 +99,9 @@ private:
     
     const float obstacleProbability = 0.2f; /*probability of a cell being an obstacle*/
     
-    std::vector<std::shared_ptr<Cell>> cells; /*each cell on the environment*/
-    std::vector<std::shared_ptr<Robot>> robots; /*each robot on the environment*/
-    std::map<std::shared_ptr<Robot>, float> robotsAtGoal; /*each robot on the environment*/
+    std::vector<std::unique_ptr<Cell>> cells; /*each cell on the environment*/
+    std::vector<std::unique_ptr<Robot>> robots; /*each robot on the environment*/
+    std::map<Robot*, float> robotsAtGoal; /*each robot on the environment*/
     Robot* selectedRobot = nullptr;
 
     std::set<std::tuple<int,int,int>> detectedConflicts; /*stores the ids of the robots for which we have already checked a conflict in this t_step*/
