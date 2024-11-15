@@ -17,6 +17,10 @@ void Env::connectCells() {
         for (int j = 0; j < this->cols; j++) {
             int currentIdx = i * this->cols + j;
 
+            if(currentIdx<0 || currentIdx>=cells.size()){
+                std::cout<<"WTF THIS SHOULDN'T HAVE HAPPENED"<<std::endl;
+            }
+
             for (auto &dir : directions) {
                 int ni = i + dir.first;
                 int nj = j + dir.second;
@@ -98,7 +102,7 @@ void Env::onClick(int id){
             std::cout<<"Selected robot "<<selectedRobot->getID()<<std::endl;
         }
         else if (selectedRobot && !selectedRobot->getGoal()){ /*if the selected robot doesn't have a goal already*/
-            selectedRobot->setGoal(cells[id]);
+            selectedRobot->setGoal(cells[id].get());
         }
         else if(!selectedRobot){/*if there is no selected robot*/
             addObstacle(id);
@@ -116,12 +120,12 @@ void Env::onClick(int id){
     }
     
     if(IsKeyPressed(KEY_G)){
-        std::shared_ptr<Robot> R = std::make_shared<Robot>(cells[id], this);
+        std::unique_ptr<Robot> R = std::make_unique<Robot>(cells[id].get(), this);
+        selectedRobot = R.get();
 
-        robots.push_back(R);
+        robots.push_back(std::move(R));
         this->placeRobot(R.get());
 
-        selectedRobot = R.get();
     }
 }
 
@@ -172,18 +176,18 @@ void Env::updateEnvironment(float t){
         r->fetchNeighborInfo();
         r->takeAction();
         if(r->atGoal()){
-            robotsAtGoal[r] = t;
+            robotsAtGoal[r.get()] = t;
         }
 
         /*if a robot is saved as a robot at goal but is no longer at his goal, remove it from the set*/
-        if(robotsAtGoal.find(r) != robotsAtGoal.end() && !r->atGoal()){
-            robotsAtGoal.erase(r);
+        if(robotsAtGoal.find(r.get()) != robotsAtGoal.end() && !r->atGoal()){
+            robotsAtGoal.erase(r.get());
         }
     }
 }
 
 void Env::addObstacle(int id){
-    if(id < 0 || id >= (this->cols * this->rows) || cells[id]->getObjID() != nullptr || cells[id]->isGoal()) {
+    if(id < 0 || id >= (cells.size()) || cells[id]->getObjID() != nullptr || cells[id]->isGoal()) {
         return;
     }
 
@@ -294,12 +298,12 @@ int Env::load_map(std::string& path){
             int startID = std::stoi(robotPair.substr(0, colonPos));
             int goalID = std::stoi(robotPair.substr(colonPos + 1));
 
-            std::shared_ptr<Robot> robot = std::make_shared<Robot>(cells[startID], this);
-            robots.push_back(robot);
+            std::unique_ptr<Robot> robot = std::make_unique<Robot>(cells[startID].get(), this);
             this->placeRobot(robot.get());
+            robots.push_back(std::move(robot));
 
             if (goalID >= 0) {
-                robot->setGoal(cells[goalID]);
+                robot->setGoal(cells[goalID].get());
             }
         }
     }
@@ -333,7 +337,7 @@ void Env::resetEnv(int nRows, int nCols, bool randomize) {
     for (int i = 0; i < nRows; ++i) {
         for(int j = 0; j<nCols; ++j){
             int currIndx = i*cols+j;
-            cells[currIndx] = std::make_shared<Cell>(currIndx, i, j);
+            cells[currIndx] = std::make_unique<Cell>(currIndx, i, j);
             if(randomize){
                 float isObstacle = obstacleDist(rng);
                 if(isObstacle<obstacleProbability){
@@ -401,7 +405,12 @@ int Env::placeRobot(Robot* r){
     return 0;
 }
 
-int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
+int Env::moveRobot(Robot* r, Cell* nextCell){
+
+    if(nextCell->isCellTransient()){
+        r->generatePath();
+    }
+
     /*never move robot if the next cell already has a robot in it*/
     if(nextCell->getObjID()){
         return -1;
@@ -413,12 +422,12 @@ int Env::moveRobot(Robot* r, std::shared_ptr<Cell> nextCell){
         return -1;
     }
 
-    std::shared_ptr<Cell> currentCell = r->getCurrentCell();
+    Cell* currentCell = r->getCurrentCell();
 
     /* get neighbors of current cell and check if next cell is in them */
-    std::vector<std::shared_ptr<Cell>> currNeighbors = currentCell->getNeighbors();
+    std::vector<Cell*> currNeighbors = currentCell->getNeighbors();
 
-    auto it = std::find_if(currNeighbors.begin(), currNeighbors.end(),[nextCell](std::shared_ptr<Cell> neighbor) {
+    auto it = std::find_if(currNeighbors.begin(), currNeighbors.end(),[nextCell](Cell* neighbor) {
         return neighbor == nextCell;
     });
 
@@ -452,13 +461,13 @@ int Env::detectConflict(Robot& r1, Robot& r2){
     }
 
     /*collect the necessary info to check for conflicts*/
-    std::shared_ptr<Cell> r1_curr = r1.getCurrentCell();
-    std::shared_ptr<Cell> r1_nn = r1.step();
-    std::vector<std::shared_ptr<Cell>> r1_remNodes = r1.getPath();
+    Cell* r1_curr = r1.getCurrentCell();
+    Cell* r1_nn = r1.step();
+    std::vector<Cell*> r1_remNodes = r1.getPath();
 
-    std::shared_ptr<Cell> r2_curr = r2.getCurrentCell();
-    std::shared_ptr<Cell> r2_nn = r2.step();
-    std::vector<std::shared_ptr<Cell>> r2_remNodes = r2.getPath();
+    Cell* r2_curr = r2.getCurrentCell();
+    Cell* r2_nn = r2.step();
+    std::vector<Cell*> r2_remNodes = r2.getPath();
 
     /*if both robots are at goal, no conflict is detected*/
     if(!r1_nn && !r2_nn){
@@ -505,26 +514,26 @@ void Env::removeGoal(int id){
 
 void Env::randomizeRobots(){
     
-    std::shared_ptr<Cell> randomCell;
+    Cell* randomCell;
     int placedRobots = 0;
 
     srand(time(NULL));
 
     while(placedRobots<nRobots){
 
-        randomCell = cells[rand()%cells.size()];
+        randomCell = cells[rand()%cells.size()].get();
 
         if(randomCell->getObjID()){
             continue;
         }
 
-        robots.emplace_back(std::make_shared<Robot>(randomCell, this));
-        randomCell = cells[rand()%cells.size()];
+        robots.emplace_back(std::make_unique<Robot>(randomCell, this));
+        randomCell = cells[rand()%cells.size()].get();
 
 
         /*don't place a goal there if it is already a goal cell*/
         do{
-            randomCell = cells[rand()%cells.size()];
+            randomCell = cells[rand()%cells.size()].get();
         }while(randomCell->isGoal());
 
         this->placeRobot(robots.back().get());
@@ -554,16 +563,16 @@ std::array<int, 2> Env::origin(){
     return ox;
 }
 
-std::shared_ptr<Cell> Env::getCellByID(int id){
-    return cells[id];
+Cell* Env::getCellByID(int id){
+    return cells[id].get();
 }
 
-std::shared_ptr<Cell> Env::getCellByPos(int x, int y){
-    return cells[x * cols + y];
+Cell* Env::getCellByPos(int x, int y){
+    return cells[x * cols + y].get();
 }
 
-std::vector<std::shared_ptr<Cell>> Env::getCells(){return cells;}
-std::vector<std::shared_ptr<Robot>> Env::getRobots(){return robots;}
+std::vector<std::unique_ptr<Cell>>& Env::getCells() {return cells;}
+std::vector<std::unique_ptr<Robot>>& Env::getRobots(){return robots;}
 
 
 /*OTHER ENVIRONMENT INFO*/
@@ -679,8 +688,8 @@ void GridRenderer::draw(Env& env, float t) {
 
     std::array<int,2> ox = env.origin();
 
-    std::vector<std::shared_ptr<Robot>> robots = env.getRobots();
-    std::vector<std::shared_ptr<Cell>> cells = env.getCells();
+    auto& robots = env.getRobots();
+    auto& cells = env.getCells();
 
     float robotRadius = cellH/2;
     float goalRadius = cellH/3;
