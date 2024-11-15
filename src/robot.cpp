@@ -55,7 +55,7 @@ void Robot::takeAction(){
     }
 }
 
-void Robot::reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>> recordedPath, std::shared_ptr<Cell> cell){
+void Robot::reconstructPath(std::unordered_map<Cell*, Cell*> recordedPath, Cell* cell){
 
     auto it = recordedPath.find(cell);
     while(it != recordedPath.end()){
@@ -79,18 +79,18 @@ void Robot::generatePath() {
         return;
     }
 
-    std::shared_ptr<Cell> tmp = currentCell;
-    std::unordered_map<std::shared_ptr<Cell>, int> gScore;
-    std::unordered_map<std::shared_ptr<Cell>, int> fScore;
-    std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>> recordedPath;
+    Cell* tmp = currentCell;
+    std::unordered_map<Cell*, int> gScore;
+    std::unordered_map<Cell*, int> fScore;
+    std::unordered_map<Cell*, Cell*> recordedPath;
 
     //use unordered set to avoid duplicates in openSet
-    std::unordered_set<std::shared_ptr<Cell>> openSet;
-    auto compareFScore = [&](const std::shared_ptr<Cell>& a, const std::shared_ptr<Cell>& b) {
+    std::unordered_set<Cell*> openSet;
+    auto compareFScore = [&](Cell* a, Cell* b) {
         return fScore[a] < fScore[b];
     };
 
-    auto getLowestFScore = [&](const std::unordered_set<std::shared_ptr<Cell>>& set) {
+    auto getLowestFScore = [&](const std::unordered_set<Cell*>& set) {
         return *std::min_element(set.begin(), set.end(), compareFScore);
     };
 
@@ -109,7 +109,7 @@ void Robot::generatePath() {
 
         openSet.erase(tmp);
 
-        std::vector<std::shared_ptr<Cell>> tmpNeighbors = tmp->getNeighbors();
+        std::vector<Cell*> tmpNeighbors = tmp->getNeighbors();
         for (auto& n : tmpNeighbors) {
             int tentativeGScore = gScore[tmp] + environment->cellDistance(*tmp, *n);
 
@@ -126,7 +126,7 @@ void Robot::generatePath() {
     }
 }
 
-void Robot::move(std::shared_ptr<Cell> newPos){ 
+void Robot::move(Cell* newPos){ 
     /*change the position of the robot*/
 
     if(newPos==nullptr){
@@ -134,7 +134,9 @@ void Robot::move(std::shared_ptr<Cell> newPos){
         return;
     }
 
-    std::vector<std::shared_ptr<Cell>> something = currentCell->getNeighbors();
+    std::vector<Cell*> something = currentCell->getNeighbors();
+
+    std::cout<<"curr cell: "<<currentCell<<std::endl;
 
     if(std::find(something.begin(), something.end(), newPos) == something.end()){
         std::cout<<id<<" [CANNOT MOVE TO NEXT CELL] "<<std::endl;
@@ -155,8 +157,8 @@ void Robot::updateDetectionArea() {
     /*use BFS to get the communication range of the robot*/
     detectionArea.clear();
 
-    std::unordered_set<std::shared_ptr<Cell>> visited{currentCell}; /*mark current cell as visited so it is not included in the range*/
-    std::deque<std::pair<std::shared_ptr<Cell>, int>> toVisit; /*cells to visit and determine distance*/
+    std::unordered_set<Cell*> visited{currentCell}; /*mark current cell as visited so it is not included in the range*/
+    std::deque<std::pair<Cell*, int>> toVisit; /*cells to visit and determine distance*/
 
     /*visit the neighbors of the current cell and determine the initial distance, these will be used for BFS*/
     for (const auto& neighbor : currentCell->getNeighbors()) {
@@ -204,7 +206,7 @@ bool Robot::findGiveWayNode(){
     /*assume there is no free neighboring node*/
     freeNeighboringNode = nullptr;
 
-    auto isInHistory = [this](std::shared_ptr<Cell> c)->bool{
+    auto isInHistory = [this](Cell* c)->bool{
         return std::find(this->pathHistory.begin(), this->pathHistory.end(), c) != this->pathHistory.end();
     };
 
@@ -235,9 +237,6 @@ void Robot::fetchNeighborInfo(){
     }
 
     noConflictDetected = false;
-
-    std::shared_ptr<Cell> rStep; /*immediate next node of neighbor robot*/
-    std::vector<std::shared_ptr<Cell>> remainingNodes; /*remaining nodes of neighbor robot rn*/
     
     for(auto n : neighbors){
 
@@ -277,7 +276,7 @@ void Robot::findFollowers(){
     neighborsRequestingNode.clear(); /*reset neighbors requesting node*/
     numberFollowers = 0; /*assume there are no followers before searching for them*/
 
-    std::shared_ptr<Cell> nextCell = this->step();
+    Cell* nextCell = this->step();
 
     /*for any neighboring robots*/
     for(auto& n : neighbors){
@@ -337,14 +336,14 @@ bool Robot::isInFollowerChain(Robot* candidate){
     return visited.count(candidate) > 0;
 }
 
-bool Robot::isInPath(std::shared_ptr<Cell> c){
+bool Robot::isInPath(Cell* c){
     return std::find(path.begin(), path.end(), c) != path.end();
 }
 
 Robot* Robot::determinePriority(Robot* r1, Robot* r2) {
     /* check which robot has the highest priority and return it */
 
-    std::shared_ptr<Cell> criticalNode = (r1->step() == r2->step()) ? r1->step() : nullptr;
+    Cell* criticalNode = (r1->step() == r2->step()) ? r1->step() : nullptr;
 
     /* priority rule number 1: robot occupying critical node is given priority */
     if(!(r1->getCurrentCell() == r2->step() && r1->step() == r2->getCurrentCell())){
@@ -420,7 +419,8 @@ void Robot::solveIntersectionConflict(Robot* n){
     Robot* priorityRobot = determinePriority(this, n);
     Robot* nonPriorityRobot = (priorityRobot == this) ? n : this;
     
-    std::vector<std::shared_ptr<Cell>> priorityPath = priorityRobot->getPath();
+    std::vector<Cell*> priorityPath = priorityRobot->getPath();
+
     if(priorityPath.size()<2 && !priorityRobot->atGoal()){
         priorityRobot->stopRobot();
         return;
@@ -430,12 +430,16 @@ void Robot::solveIntersectionConflict(Robot* n){
         return;
     }
 
+    if(priorityPath.size()<2){
+        priorityRobot->stopRobot();
+        return;
+    }
+
     Robot* aheadRobot = priorityPath[1]->getObjID(); /*points to the robot occupying n(t+2) of high priority robot*/
 
     /*based on that, the robot of more priority checks if it's n(t+2) node is free
     (a free node is one wich is not an obstacle or is not occupied by another robot in that time step)*/
-    if(!priorityPath[1]->isObstacle() && !aheadRobot){
-
+    if(!aheadRobot){
         nonPriorityRobot->stopRobot();
         /*if the node is free, the low priority robot and all robots requesting the node stop*/
         for(auto r : priorityRobot->neighborsRequestingNode){
@@ -454,12 +458,16 @@ void Robot::solveIntersectionConflict(Robot* n){
                 if(n->findGiveWayNode()){
                     std::cout<<"neighbor "<<n->getID()<<" asked to give way for robot "<<aheadRobot->getID()<<std::endl;
                     n->giveWay();
+                    std::cout<<"INSERTING FOLLOWER PATH INTO ROBOT"<<std::endl;
                     aheadRobot->path.insert(path.begin(), n->getCurrentCell());
+                    std::cout<<"REACHED THIS POINT, NO PROBLEM"<<std::endl;
                     break;
                 }
             }
         }
     }
+
+    std::cout<<"EXITING FUNCTION NOW"<<std::endl;
 }
 
 void Robot::solveOppositeConflict(Robot* n){
@@ -498,7 +506,7 @@ void Robot::giveWay(){
 
         giveWayNode = freeNeighboringNode;
 
-        std::vector<std::shared_ptr<Cell>> nextNeighbors = this->step()->getNeighbors();
+        std::vector<Cell*> nextNeighbors = this->step()->getNeighbors();
 
         /*returns true if the cell can be reached from the next cell in the path*/
         auto isReachable = [this, &nextNeighbors]() -> bool {
@@ -516,15 +524,15 @@ void Robot::giveWay(){
 }
 
 /*return next step of the robot*/
-std::shared_ptr<Cell> Robot::step(){
+Cell* Robot::step(){
     return path.front();
 }
 
-std::vector<std::shared_ptr<Cell>> Robot::getPath(){
+const std::vector<Cell*>& Robot::getPath(){
     return this->path;
 }
 
-std::vector<std::shared_ptr<Cell>> Robot::getArea(){
+const std::vector<Cell*>& Robot::getArea(){
     return this->detectionArea;
 }
 
@@ -549,7 +557,7 @@ bool Robot::atGoal(){
     return done;
 }
 
-void Robot::setGoal(std::shared_ptr<Cell> goalPos){
+void Robot::setGoal(Cell* goalPos){
     goal = goalPos;
     if(goalPos != currentCell){
         environment->addGoal(goalPos->getID());
@@ -602,6 +610,6 @@ size_t Robot::relativePathSize(){
     return pathHistory.size()/pathLength;
 }
 
-std::shared_ptr<Cell> Robot::getCurrentCell(){return this->currentCell;}
+Cell* Robot::getCurrentCell(){return this->currentCell;}
 
-std::shared_ptr<Cell> Robot::getGoal(){return this->goal;}
+Cell* Robot::getGoal(){return this->goal;}
