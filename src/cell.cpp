@@ -17,11 +17,12 @@ std::array<int, 2> Cell::getPos(){
     return p;
 }
 
-std::vector<std::shared_ptr<Cell>> Cell::getNeighbors(){
+const std::vector<Cell*>& Cell::getNeighbors(){
+    std::cout<<"Size of neighbors "<<this->neighbors.size()<<std::endl;
     return this->neighbors;
 }
 
-void Cell::addNeighbor(std::shared_ptr<Cell> newNeighbor){
+void Cell::addNeighbor(Cell* newNeighbor){
     /*if the cell to be added as a neighbor is an obstacle, do not add it*/
     if(!newNeighbor->isObstacle())
         this->neighbors.push_back(newNeighbor);
@@ -30,14 +31,14 @@ void Cell::addNeighbor(std::shared_ptr<Cell> newNeighbor){
 void Cell::updateNeighbors(std::vector<std::vector<int>>& adjMatrix, Env& env){
     /*uses adjacency matrix of the graph to update the neighbors vector*/
 
-    std::shared_ptr<Cell> tempCell;
-    std::vector<std::shared_ptr<Cell>> updatedNeighbors;
+    Cell* tempCell;
+    std::vector<Cell*> updatedNeighbors;
 
     /*iterate through the row of the current cell and use connections to update neighbors*/
     for(size_t j = 0; j<adjMatrix[this->id].size();j++){
         /*check if the current cell is in the neighbors vector*/
         if(adjMatrix[this->id][j]!=0){
-            auto neighbor = env.getCellByID(j);
+            Cell* neighbor = env.getCellByID(j);
             if(!neighbor->isObstacle()){
                 updatedNeighbors.push_back(neighbor);
             }
@@ -53,6 +54,16 @@ bool Cell::isObstacle(){
         return true;
     }
     return false;
+}
+
+void Cell::setTransient(){
+    /*mark a cell as a transient obstacle*/
+    if(isObstacle())
+        isTransient = true;
+}
+
+bool Cell::isCellTransient(){
+    return isTransient;
 }
 
 bool Cell::isGoal(){
