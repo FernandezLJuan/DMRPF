@@ -80,10 +80,10 @@ int main(int argc, char* argv[]){
     origin.lookupValue("x", e_posX);
     origin.lookupValue("y", e_posY);
 
-    std::shared_ptr<Env> grid = std::make_shared<Env>(e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols, e_robs, e_obsProb); /*initializes the environment*/
+    Env grid(e_cellW, e_cellH, e_posX, e_posY, e_rows, e_cols, e_robs, e_obsProb); /*initializes the environment*/
 
-    if(grid->load_map(e_map)<0){
-        grid->randomGrid(); /*if the map file was invalid, randomize everything*/
+    if(grid.load_map(e_map)<0){
+        grid.randomGrid(); /*if the map file was invalid, randomize everything*/
     }
 
     GridRenderer renderer(e_cellW,e_cellH,e_rows, e_cols);
@@ -106,20 +106,20 @@ int main(int argc, char* argv[]){
             BeginDrawing();
 
             ClearBackground(bgColor);
-            renderer.draw(*grid, totalTime);
+            renderer.draw(grid, totalTime);
 
-            if(grid->isRunning()){
+            if(grid.isRunning()){
                 timeElapsed += deltaTime;
                 totalTime += deltaTime;
             }
             
             Vector2 mousePos = GetMousePosition();
-            mouseID = posToID(*grid,mousePos);
+            mouseID = posToID(grid,mousePos);
 
-            grid->onClick(mouseID);
+            grid.onClick(mouseID);
 
             if(timeElapsed>=timeStep){
-                grid->updateEnvironment(totalTime);
+                grid.updateEnvironment(totalTime);
                 timeElapsed = 0.0;
             }
 
