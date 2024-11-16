@@ -5,6 +5,8 @@ int Robot::currentID = 0;
 void Robot::takeAction(){
     /*robot will either stop for this step or follow the path to it's next node*/
 
+    std::cout<<id<<" taking action "<<std::endl;
+
     /*generate random number between 0 and 1*/
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -19,6 +21,10 @@ void Robot::takeAction(){
         /*resume movement if the leader is not waiting*/
         if(noConflictDetected){
             if(!path.empty()){
+                if(!path.front()){
+                    std::cout<<"WTF"<<std::endl;
+                }
+
                 leader = path.front()->getObjID();
 
                 if(leader){
@@ -55,9 +61,21 @@ void Robot::takeAction(){
     }
 }
 
+void Robot::resetPath(){
+    pathHistory.clear();
+    path.clear();
+    pathLength = 0;
+}
+
+void Robot::insertCell(Cell* c){
+    path.insert(path.begin(), c);
+}
+
 void Robot::reconstructPath(std::unordered_map<Cell*, Cell*> recordedPath, Cell* cell){
 
     auto it = recordedPath.find(cell);
+    size_t oldPathLength = pathLength;
+
     while(it != recordedPath.end()){
         path.push_back(cell);
         cell = it->second;
@@ -67,13 +85,15 @@ void Robot::reconstructPath(std::unordered_map<Cell*, Cell*> recordedPath, Cell*
 
     std::reverse(path.begin(), path.end());
 
-    pathLength = (path.size()>0) ? path.size() : pathLength ;
+    pathLength = (path.size()>0) ? path.size()+oldPathLength : oldPathLength;
+
+    std::cout<<id<<"With path length: "<<pathLength<<std::endl;
 }
 
 void Robot::generatePath() {
+    /*generates a path from the current cell to the goal of the robot, it keeps the old path history*/
 
     this->path.clear();
-    this->pathHistory.clear();
 
     if (goal == nullptr) {
         return;
@@ -134,9 +154,7 @@ void Robot::move(Cell* newPos){
         return;
     }
 
-    std::vector<Cell*> something = currentCell->getNeighbors();
-
-    std::cout<<"curr cell: "<<currentCell<<std::endl;
+    const std::vector<Cell*>& something = currentCell->getNeighbors();
 
     if(std::find(something.begin(), something.end(), newPos) == something.end()){
         std::cout<<id<<" [CANNOT MOVE TO NEXT CELL] "<<std::endl;
@@ -190,12 +208,13 @@ void Robot::updateDetectionArea() {
     }
 }
 
-void Robot::getNeighbors(){
+void Robot::findNeighbors(){
     neighbors.clear();
 
     for(auto& c : detectionArea){
-        if(c->getObjID()){
-            neighbors.push_back(c->getObjID());
+        auto robot = c->getObjID();
+        if(robot){
+            neighbors.push_back(robot);
         }
     }
 }
@@ -243,7 +262,10 @@ void Robot::fetchNeighborInfo(){
         if(!n){
             continue;
         }
-        switch(environment->detectConflict(*this, *n)){
+
+        std::cout<<"checking conflict between "<<this->getID()<<" AND "<<n->getID()<<std::endl;
+
+        switch(environment->detectConflict(this, n)){
             case 0:
                 noConflictDetected = true;
                 this->resumeRobot();
@@ -261,10 +283,12 @@ void Robot::fetchNeighborInfo(){
                 break;
             case 1:
                 /*OPPOSITE CONFLICT*/
+                ++conflictCount[0];
                 solveOppositeConflict(n);
                 break;
             case 2:
                 /*INTERSECTION CONFLICT*/
+                ++conflictCount[1];
                 std::cout<<"[INTERSECTION CONFLICT BETWEEN] <"<<id<<" AND "<<n->getID()<<">"<<std::endl;
                 solveIntersectionConflict(n);
                 break;
@@ -275,8 +299,6 @@ void Robot::fetchNeighborInfo(){
 void Robot::findFollowers(){
     neighborsRequestingNode.clear(); /*reset neighbors requesting node*/
     numberFollowers = 0; /*assume there are no followers before searching for them*/
-
-    Cell* nextCell = this->step();
 
     /*for any neighboring robots*/
     for(auto& n : neighbors){
@@ -317,6 +339,8 @@ void Robot::findFollowers(){
             neighborsRequestingNode.push_back(n);
         }
     }
+
+    nodeRequests += neighborsRequestingNode.size();
 }
 
 bool Robot::isInFollowerChain(Robot* candidate){
@@ -416,8 +440,8 @@ void Robot::solveIntersectionConflict(Robot* n){
     /*solves intersection conflict with robot n*/
 
     /*first, we must determine which robot has priority*/
-    Robot* priorityRobot = determinePriority(this, n);
-    Robot* nonPriorityRobot = (priorityRobot == this) ? n : this;
+    auto priorityRobot = determinePriority(this, n);
+    auto nonPriorityRobot = (priorityRobot == this) ? n : this;
     
     std::vector<Cell*> priorityPath = priorityRobot->getPath();
 
@@ -443,6 +467,10 @@ void Robot::solveIntersectionConflict(Robot* n){
         nonPriorityRobot->stopRobot();
         /*if the node is free, the low priority robot and all robots requesting the node stop*/
         for(auto r : priorityRobot->neighborsRequestingNode){
+            if(!r){
+                continue;
+            }
+
             r->stopRobot();
             r->noConflictDetected = false;
         }
@@ -453,14 +481,19 @@ void Robot::solveIntersectionConflict(Robot* n){
             aheadRobot->giveWay();
         }
         else{
+            std::vector<Robot*> aheadNeighbors = aheadRobot->getNeighbors();
             /*if no neighboring node is found, ask neighbor robot to move out of the way*/
-            for(auto& n : aheadRobot->neighbors){
+            for(auto& n : aheadNeighbors){
+                if(!n){
+                    continue;
+                }
                 if(n->findGiveWayNode()){
                     std::cout<<"neighbor "<<n->getID()<<" asked to give way for robot "<<aheadRobot->getID()<<std::endl;
                     n->giveWay();
                     std::cout<<"INSERTING FOLLOWER PATH INTO ROBOT"<<std::endl;
-                    aheadRobot->path.insert(path.begin(), n->getCurrentCell());
+                    aheadRobot->insertCell(n->getCurrentCell());
                     std::cout<<"REACHED THIS POINT, NO PROBLEM"<<std::endl;
+                    std::cout<<n->getID()<<", "<<aheadRobot->getID()<<std::endl;
                     break;
                 }
             }
@@ -506,7 +539,7 @@ void Robot::giveWay(){
 
         giveWayNode = freeNeighboringNode;
 
-        std::vector<Cell*> nextNeighbors = this->step()->getNeighbors();
+        const std::vector<Cell*>& nextNeighbors = this->step()->getNeighbors();
 
         /*returns true if the cell can be reached from the next cell in the path*/
         auto isReachable = [this, &nextNeighbors]() -> bool {
@@ -520,20 +553,30 @@ void Robot::giveWay(){
 
         path.insert(path.begin(), giveWayNode);
         givingWay = true;
+        givenWay++;
     }
 }
 
 /*return next step of the robot*/
 Cell* Robot::step(){
+    if(path.empty()){
+        return goal;
+    }
     return path.front();
 }
 
+/*return vector of pointers as const reference to avoid early 
+delete of memory inside function callers*/
 const std::vector<Cell*>& Robot::getPath(){
     return this->path;
 }
 
 const std::vector<Cell*>& Robot::getArea(){
     return this->detectionArea;
+}
+
+const std::vector<Robot*>& Robot::getNeighbors(){
+    return this->neighbors;
 }
 
 void Robot::stopRobot(){
@@ -565,14 +608,6 @@ void Robot::setGoal(Cell* goalPos){
     this->generatePath();
 }
 
-void Robot::setLeader(Robot* l){
-    this->leader = l;
-}
-
-Robot* Robot::getLeader(){
-    return leader;
-}
-
 void Robot::removeGoal(){
     if(!goal){
         return;
@@ -602,11 +637,29 @@ int Robot::getNeighborsRequestingNode(){
     return neighborsRequestingNode.size();
 }
 
-std::array<int, 6> Robot::getRuleCount(){
+const std::array<int, 6> Robot::getRuleCount(){
     return ruleCount;
 }
 
+const std::array<int,2> Robot::getConflictCount(){
+    return conflictCount;
+}
+
+int Robot::howManyGiveWays(){
+    return givenWay;
+}
+
+size_t Robot::totalRequests(){
+    return nodeRequests;
+}
+
 size_t Robot::relativePathSize(){
+
+    if(pathLength<=0){
+        std::cout<<"NO PATH??"<<std::endl;
+        return 0;
+    }
+
     return pathHistory.size()/pathLength;
 }
 
