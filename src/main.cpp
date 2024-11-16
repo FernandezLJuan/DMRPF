@@ -2,6 +2,7 @@
 #include "robot.h"
 #include <libconfig.h++>
 #include <unistd.h>
+#include <chrono>
 
 //TODO: FIND OUT WHY LOOPS APPEAR ON SOME ROBOTS AFTER SOLVING A CONFLICT
 //TODO: SOLVE LOOPS IN GIVE WAY TO LEADER AND GIVE WAY IN CONFLICT
@@ -92,6 +93,7 @@ int main(int argc, char* argv[]){
     Color bgColor = {0x36,0x39,0x3e,255};
 
     SetTraceLogLevel(LOG_NONE);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(w_width, w_height, w_title.c_str());
     SetTargetFPS(30);
     EnableEventWaiting();
