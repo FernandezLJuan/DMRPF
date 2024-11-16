@@ -18,7 +18,6 @@ std::array<int, 2> Cell::getPos(){
 }
 
 const std::vector<Cell*>& Cell::getNeighbors(){
-    std::cout<<"Size of neighbors "<<this->neighbors.size()<<std::endl;
     return this->neighbors;
 }
 
@@ -28,25 +27,20 @@ void Cell::addNeighbor(Cell* newNeighbor){
         this->neighbors.push_back(newNeighbor);
 }
 
-void Cell::updateNeighbors(std::vector<std::vector<int>>& adjMatrix, Env& env){
-    /*uses adjacency matrix of the graph to update the neighbors vector*/
+void Cell::updateNeighbors(std::vector<std::vector<int>>& adjMatrix,Env& env) {
+    /* clear the current neighbors vector */
+    neighbors.clear();
+    neighbors.reserve(8); /* reserve enough space to avoid multiple reallocations */
 
-    Cell* tempCell;
-    std::vector<Cell*> updatedNeighbors;
-
-    /*iterate through the row of the current cell and use connections to update neighbors*/
-    for(size_t j = 0; j<adjMatrix[this->id].size();j++){
-        /*check if the current cell is in the neighbors vector*/
-        if(adjMatrix[this->id][j]!=0){
+    /* iterate through the row of the adjacency matrix corresponding to this cell */
+    for (size_t j = 0; j < adjMatrix[this->id].size(); ++j) {
+        if (adjMatrix[this->id][j] != 0) { /* check if there is a connection to this cell */
             Cell* neighbor = env.getCellByID(j);
-            if(!neighbor->isObstacle()){
-                updatedNeighbors.push_back(neighbor);
+            if (neighbor != nullptr && !neighbor->isObstacle()) { /* check for null pointer and obstacle */
+                neighbors.push_back(neighbor);
             }
         }
     }
-
-    /*use move to update neighbors list, more efficient than previous code*/
-    this->neighbors = std::move(updatedNeighbors);
 }
 
 bool Cell::isObstacle(){

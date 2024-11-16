@@ -21,7 +21,7 @@ public:
 
     /*NEIGHBOR RELATED*/
     void addNeighbor(Cell*);
-    void updateNeighbors(std::vector<std::vector<int>>&, Env& env); /*update neighbors based on adjacency matrix of environment, might replace addNeighbor*/
+    void updateNeighbors(std::vector<std::vector<int>>&,Env& env); /*update neighbors based on adjacency matrix of environment, might replace addNeighbor*/
 
     /*get info about type*/
     bool isObstacle();
