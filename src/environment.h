@@ -35,6 +35,7 @@ public:
             adjMatrix= std::vector<std::vector<int> >(rows*cols, std::vector<int>(rows*cols, 0));
 
             cells.reserve(rows*cols);
+            robots.reserve(nRobots);
         }
 
     void pauseSim();
@@ -55,7 +56,7 @@ public:
     /*ROBOT MANAGEMENT FUNCTIONS*/
     int placeRobot(Robot*); /*place robot in the environment*/
     int moveRobot(Robot* , Cell*); /*update robot position*/
-    int detectConflict(Robot&, Robot&); /*return the type of conflict it has detected*/
+    int detectConflict(Robot*, Robot*); /*return the type of conflict it has detected*/
     void remakePaths();
     void addGoal(int);
     void removeGoal(int);
@@ -77,6 +78,7 @@ public:
     int connectionCost(Cell&, Cell&); /*get the cost of the edge between to cells*/
     void logAdj(); /*show the adjacency matrix on screen, for debug purposes*/
     void dump_map();
+    void dumpResults(); /*dumps the results of the simulation into a file*/
 
 
 private:
@@ -97,7 +99,8 @@ private:
     std::uniform_real_distribution<float> obstacleDist; /*distribution of obstacle probability*/
     std::uniform_int_distribution<> cellDist = std::uniform_int_distribution<>(0,this->rows*this->cols); /*distribution for random cell obstacles*/
     
-    const float obstacleProbability = 0.2f; /*probability of a cell being an obstacle*/
+    const float obstacleProbability; /*probability of a cell being an obstacle*/
+    const float transientProbability = 0.2f; /*probability of a random obstacle appearing in the environment*/
     
     std::vector<std::unique_ptr<Cell>> cells; /*each cell on the environment*/
     std::vector<std::unique_ptr<Robot>> robots; /*each robot on the environment*/
