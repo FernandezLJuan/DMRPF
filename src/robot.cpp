@@ -233,8 +233,18 @@ bool Robot::findGiveWayNode(){
         /*if there isn't a robot in the neighbor, use it as give way node*/
 
         for(auto& rn : neighbors){
-            if(cellNeighbor != rn->step()){    
+            if(cellNeighbor != rn->step()){
+                
+                /*if a neighboring cell is not part of our current path and is not occupied by a robot, 
+                consider it as a valid give-way node, provided it has not been visited before.
+                This prevents the robot from looping between nodes in its movement history*/
                 if((cellNeighbor->getObjID()==nullptr && !isInPath(cellNeighbor)) && !isInHistory(cellNeighbor)){
+                    freeNeighboringNode = cellNeighbor;
+                    break;
+                }
+                else if((cellNeighbor->getObjID()==nullptr && !isInPath(cellNeighbor))){
+                    /* if no strict give-way node is found, allow a previously visited cell (from history),
+                    as long as it’s unoccupied and not part of the current path. */
                     freeNeighboringNode = cellNeighbor;
                     break;
                 }
