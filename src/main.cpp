@@ -94,6 +94,7 @@ int main(int argc, char* argv[]){
 
     SetTraceLogLevel(LOG_NONE);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetConfigFlags(FLAG_VSYNC_HINT);
     InitWindow(w_width, w_height, w_title.c_str());
     SetTargetFPS(30);
     EnableEventWaiting();
@@ -135,7 +136,7 @@ int main(int argc, char* argv[]){
             }
 
             EndDrawing();
-            usleep(10000);
+            usleep(1000);
         }
     }
 
