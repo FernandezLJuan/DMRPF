@@ -35,6 +35,7 @@ public:
 
     void setType(cellType);
     void setTransient();
+    void removeTransient();
     void logType();
     void logPos();
 

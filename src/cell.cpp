@@ -56,6 +56,10 @@ void Cell::setTransient(){
         isTransient = true;
 }
 
+void Cell::removeTransient(){
+    isTransient = false;
+}
+
 bool Cell::isCellTransient(){
     return isTransient;
 }
