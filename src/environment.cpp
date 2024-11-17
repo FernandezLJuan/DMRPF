@@ -138,45 +138,7 @@ void Env::updateEnvironment(float t){
     std::cout<<"Updating for time: "<<t<<std::endl;
     /*if all robots are at goal, pause the simulation*/
     if(robotsAtGoal.size() == robots.size() && robots.size()!=0){
-
-        std::array<int, 6> totalRuleCounts = {0,0,0,0,0,0};
-        std::array<int,2> totalConflictCount = {0,0};
-        std::cout<<"All robots at goal, pausing simulation"<<std::endl;
-
-        auto lastElement = robotsAtGoal.rbegin();
-        auto slowestRobot = lastElement->first;
-        float highestTime = lastElement->second;
-
-        std::cout<<"Slowest robot: "<<slowestRobot->getID()<<" with time: "<<highestTime<<std::endl;
-
-        for(const auto& r : robots){
-            std::cout<<"For robot: "<<r->getID()<<std::endl;
-            std::cout<<"\t-Relative path size = "<<r->relativePathSize()<<std::endl;
-            std::cout<<"\t-Given way= "<<r->howManyGiveWays()<<std::endl;
-            std::cout<<"\t-Total node requests= "<<r->totalRequests()<<std::endl;
-            std::cout<<"\t-Opposite conflicts: "<<r->getConflictCount()[0]<<std::endl;
-            std::cout<<"\t-Intersection conflicts: "<<r->getConflictCount()[1]<<std::endl;
-
-            const std::array<int, 6>& ruleCount = r->getRuleCount();
-            const std::array<int,2>& conflictCount = r->getConflictCount();
-
-            std::transform(ruleCount.begin(), ruleCount.end(), totalRuleCounts.begin(),
-                   totalRuleCounts.begin(), std::plus<>());
-
-            std::transform(conflictCount.begin(), conflictCount.end(), totalConflictCount.begin(),
-                   totalConflictCount.begin(), std::plus<>());
-        }
-
-        std::cout<<"\n";
-        for(size_t i = 0; i<6; i++){
-            std::cout<<"Rule "<<i+1<<" activated: "<<totalRuleCounts[i]<<" times"<<std::endl;
-        }
-
-        std::cout<<"\n";
-        for(size_t i = 0; i<2; i++){
-            std::cout<<"Conflict "<<i+1<<" detected: "<<totalConflictCount[i]<<" times"<<std::endl;
-        }
-
+        dumpResults();
         this->pauseSim();
     }
 
@@ -211,7 +173,7 @@ void Env::updateEnvironment(float t){
         r->findFollowers();
         r->fetchNeighborInfo();
         r->takeAction();
-        if(r->atGoal()){
+        if(r->atGoal() && robotsAtGoal.find(r.get()) == robotsAtGoal.end()){
             robotsAtGoal[r.get()] = t;
         }
 
@@ -242,6 +204,7 @@ void Env::removeObstacle(int id){
     }
 
     cells[id]->setType(cellType::CELL_FREE);
+    cells[id]->removeTransient();
     updateNeighborConnections(id, true);
 }
 
@@ -460,10 +423,10 @@ int Env::moveRobot(Robot* r, Cell* nextCell){
     }
 
     /*don't move robot if it wants to go to the same position*/
-    if(nextCell == r->getCurrentCell()){
+    /* if(nextCell == r->getCurrentCell()){
         std::cout<<"stay there pal"<<std::endl;
         return -1;
-    }
+    } */
 
     Cell* currentCell = r->getCurrentCell();
 
@@ -682,6 +645,9 @@ void Env::dump_map(){
     if(response == "n" || response == "N"){
         return;
     }
+    else if(response != "y" || response != "Y"){
+        return;
+    }
 
     std::cout<<"what do you want to name this map? ";
     std::cin>>mapName;
@@ -733,87 +699,84 @@ void Env::dump_map(){
 
 }
 
+void Env::dumpResults(){
+
+    /*creates .dat file with the results of the simulation*/
+    std::ofstream recordFile; 
+    std::string robotDataLabels = "#Robot Data\n#Robot_ID #total_time #p_size #givenWay #n_requests\n";
+    std::string globalDataLabels = "\n#Global Data\n#op_conflicts #in_conflicts #rule_1 #rule_2 #rule_3 #rule_4 #rule_5 #rule_6\n";
+
+    recordFile.open("simulation.dat");
+    recordFile<<robotDataLabels;
+
+    std::array<int, 6> totalRuleCounts = {0,0,0,0,0,0};
+    std::array<int, 2> totalConflicts = {0,0};
+
+    for(auto& r : robots){
+        std::stringstream robotRow;
+
+        int robotID = r->getID();
+        int givenWay = r->howManyGiveWays();
+        float totalTime = robotsAtGoal[r.get()];
+        size_t p_size = r->relativePathSize();
+        size_t nodeRequests = r->totalRequests();
+
+        robotRow<<std::to_string(robotID)<<" "<<std::to_string(totalTime)<<" "<<std::to_string(p_size)<<" "<<std::to_string(nodeRequests)<<" "<<std::to_string(givenWay)<<"\n";
+        recordFile<<robotRow.rdbuf();
+
+        std::array<int, 6> robotRuleCounts = r->getRuleCount();
+        std::array<int, 2> robotConflictCounts = r->getConflictCount();
+
+        for(size_t i = 0; i<6; i++){
+            totalRuleCounts[i] += robotRuleCounts[i];
+        }
+
+        for(size_t j = 0; j<2; j++){
+            totalConflicts[j] += robotConflictCounts[j];
+        }
+    }
+
+    recordFile<<globalDataLabels;
+    std::stringstream globalRow;
+    
+    for(size_t j = 0; j<2; j++){
+        std::cout<<"Writing conflict counts"<<std::endl;
+        globalRow<<std::to_string(totalConflicts[j])<<" ";
+    }
+    for(size_t i = 0; i<6; i++){
+        globalRow<<std::to_string(totalRuleCounts[i])<<" ";
+    }
+    globalRow<<"\n";
+
+    recordFile<<globalRow.rdbuf();
+
+    recordFile.close();
+
+}
+
 /* DRAWING THE ENVIRONMENT */
 void GridRenderer::draw(Env& env, float t) {
-    
-    if(!env.isRunning()){
-        DrawText("SIMULATION PAUSED", 10,10,20,RED);
+    if (!env.isRunning()) {
+        DrawText("SIMULATION PAUSED", 10, 10, 20, RED);
     }
 
-    std::array<int, 2> eDims = env.getDims();
-
-    std::array<int,2> ox = env.origin();
-
-    auto& robots = env.getRobots();
     auto& cells = env.getCells();
+    auto& robots = env.getRobots();
+    auto ox = env.origin();
 
-    float robotRadius = cellH/2;
-    float goalRadius = cellH/3;
+    for (auto& c : cells) {
+        auto pos = c->getPos();
+        auto drawPos = std::array<int, 2>{ pos[1] * cellW + 1 + ox[0], pos[0] * cellH + 1 + ox[1] };
 
-    for(auto& c : cells){
-        Robot* tempRobot = nullptr;
-        std::array<int, 2> pos = c->getPos();
-        std::array<int,2> drawPos = {pos[1]*cellW+1+ox[0], pos[0]*cellH+1+ox[1]};
+        Color cellColor = c->isGoal() ? GREEN 
+                : (c->isObstacle() && c->isCellTransient()) ? ORANGE 
+                : c->isObstacle() ? GRAY 
+                : WHITE;
+                
+        DrawRectangle(drawPos[0], drawPos[1], cellW, cellH, cellColor);
 
-        int cellID = c->getID();
-        bool isGoal = c->isGoal();
-        bool isTransient = c->isCellTransient();
-        bool isObstacle = c->isObstacle();
-
-        tempRobot = c->getObjID();
-
-        if (pos[0] == 0) {
-            DrawText(TextFormat("%d", pos[1]), drawPos[0] + cellW / 2 - 10, drawPos[1] - 30, 20, WHITE);
+        if (auto tempRobot = c->getObjID()) {
+            DrawCircle(drawPos[0] + cellW / 2, drawPos[1] + cellH / 2, cellH / 2, robotColors[tempRobot->getID()]);
         }
-        if (cellID % eDims[1] == 0) {
-            DrawText(TextFormat("%d", pos[0]), drawPos[0] - 25, drawPos[1] + cellH / 2 - 10, 20, WHITE);
-        }
-
-        if(isTransient){
-            DrawRectangle(drawPos[0], drawPos[1], cellH, cellW, ORANGE);
-        }
-        else if(isObstacle){
-            DrawRectangle(drawPos[0], drawPos[1], cellH, cellW, GRAY);
-        }
-        else{
-            DrawRectangle(drawPos[0], drawPos[1], cellH, cellW, WHITE);
-        }
-
-        if(isGoal){
-            DrawCircle(drawPos[0]+cellH/2, drawPos[1]+cellW/2, goalRadius, GREEN);
-        }
-
-        if(tempRobot){
-            DrawCircle(drawPos[0]+cellH/2, drawPos[1]+cellW/2, robotRadius, robotColors[tempRobot->getID()]);
-        }
-
-        DrawRectangleLines(drawPos[0], drawPos[1], cellH, cellW, BLACK);
-    }
-
-    int offsetY = 30;
-    const float baseHeight = 80; //minium height for display rectangle
-    float height = static_cast<float>(55 * robots.size());
-    height = (height < baseHeight) ? baseHeight : height;   
-    std::string robotState;
-    Color robotDisplayColor = {0xeb,0xed,0xeb,255};
-    Rectangle displayRect = {30,40,150,height};
-    
-    DrawRectangle(displayRect.x,displayRect.y,displayRect.width,displayRect.height, robotDisplayColor);
-    DrawRectangleLinesEx(displayRect,5.0f, BLACK);
-    DrawText(TextFormat("t = %.2f",t),displayRect.x+20,displayRect.y+20, 20, BLACK);
-
-    for(auto& robot : robots){
-        int rID = robot->getID();
-        if(robot->atGoal()){
-            robotState = " is at goal";
-        }
-        else if(robot->isMoving()){
-            robotState = " is moving";
-        }
-        else{
-            robotState = " is waiting";
-        }
-        DrawText(TextFormat("%d %s", rID, robotState.c_str()), 50,60+offsetY, 20, robotColors[rID]);
-        offsetY+=30;
     }
 }
