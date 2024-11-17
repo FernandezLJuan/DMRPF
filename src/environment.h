@@ -36,6 +36,8 @@ public:
 
             cells.reserve(rows*cols);
             robots.reserve(nRobots);
+
+            std::cout<<"transient probability is: "<<transientProbability<<std::endl;
         }
 
     void pauseSim();
@@ -104,7 +106,7 @@ private:
     
     std::vector<std::unique_ptr<Cell>> cells; /*each cell on the environment*/
     std::vector<std::unique_ptr<Robot>> robots; /*each robot on the environment*/
-    std::map<Robot*, float> robotsAtGoal; /*each robot on the environment*/
+    std::map<Robot*, float> robotsAtGoal; /*each robot at goal with it's associated time of arrival*/
     Robot* selectedRobot = nullptr;
 
     std::set<std::tuple<int,int,int>> detectedConflicts; /*stores the ids of the robots for which we have already checked a conflict in this t_step*/
