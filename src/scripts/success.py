@@ -81,7 +81,7 @@ robot_groups_precisions = {}
 
 for map_group, maps in grouped_maps.items():
     for map_name, (min_range, max_range) in maps.items():
-        tmp_path = results_path + map_name + '/repeated_sims/'
+        tmp_path = results_path + map_name + '/deterministic/'
         result_files = find_files(tmp_path, map_name)
 
         #parse files
@@ -140,13 +140,9 @@ for map_group, maps in grouped_maps.items():
 
 #after accumulating the precision values in robot_groups_precisions
 for map_name, robot_groups in robot_groups_precisions.items():
-    print(f"\nPrecisions for map: {map_name}")
-    
     #iterate through each robot group in the map
     for num_robots, precisions in sorted(robot_groups.items()):
         avg_precision = sum(precisions) / len(precisions) if precisions else 0
-        print(f"  Number of robots: {num_robots}")
-        print(f"    Average precision: {avg_precision:.2f}%")
 
 
 #calculate average and standard deviation of success_rate for each robot group and map
@@ -155,12 +151,9 @@ std_precisions = {}
 for map_name, robot_counts in robot_groups_precisions.items():
     avg_precisions[map_name] = {}
     std_precisions[map_name] = {}
-    print(f"{map_name}")
     for robot_count, precisions in robot_counts.items():
         avg_precisions[map_name][robot_count] = np.mean(precisions)
         std_precisions[map_name][robot_count] = np.std(precisions)
-        print(f"Number of robots: {robot_count}")
-        print(f"    Standard deviation: {std_precisions[map_name][robot_count]:.2f}%")
 
 # Plot for "mapas reales"
 plot_group(grouped_maps["mapas_reales"], "Mapas Reales")
