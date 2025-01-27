@@ -1,93 +1,127 @@
 #include "cell.h"
 #include "environment.h"
 
-void Cell::setType(cellType newType){
-    this->type = newType;
+void Cell::setGoal(){
+    //mark the cell as a goal
+    goal = true;
 }
 
-int Cell::getID(){return this->id;}
+void Cell::removeGoal(){
+    //remove goal property from cell
+    goal = false;
+}
+
+int Cell::getID(){
+    //return the cell's id
+    return this->id;
+}
 
 void Cell::setObjID(Robot* newID){
+    //set the objID to a robot occupying the cell
+    if(!newID){
+        return;
+    }
     this->objectID = newID;
 }
 
-Robot* Cell::getObjID(){return this->objectID;}
+Robot* Cell::getObjID(){
+    //return the robot in the cell
+    return this->objectID;
+}
+
 std::array<int, 2> Cell::getPos(){
+    //return the cell's position
     std::array<int, 2> p{x,y};
     return p;
 }
 
-std::vector<std::shared_ptr<Cell>> Cell::getNeighbors(){
+const std::vector<Cell*>& Cell::getNeighbors(){
+    //return the neighbors in the adjacency list
     return this->neighbors;
 }
 
-void Cell::addNeighbor(std::shared_ptr<Cell> newNeighbor){
-    /*if the cell to be added as a neighbor is an obstacle, do not add it*/
+void Cell::addNeighbor(Cell* newNeighbor){
+    //adds a new neighbor to the vector if it is not an obstacle
     if(!newNeighbor->isObstacle())
         this->neighbors.push_back(newNeighbor);
 }
 
-void Cell::updateNeighbors(std::vector<std::vector<int>>& adjMatrix, Env& env){
-    /*uses adjacency matrix of the graph to update the neighbors vector*/
+void Cell::updateNeighbors(std::unordered_map<int,std::unordered_map<int,float>>& adjMatrix, Env& env){
+    //update adjacency list of the cell based on the adjacency matrix of the graph
+    neighbors.clear();
+    neighbors.reserve(8);
 
-    std::shared_ptr<Cell> tempCell;
-    std::vector<std::shared_ptr<Cell>> updatedNeighbors;
-
-    /*iterate through the row of the current cell and use connections to update neighbors*/
-    for(size_t j = 0; j<adjMatrix[this->id].size();j++){
-        /*check if the current cell is in the neighbors vector*/
-        if(adjMatrix[this->id][j]!=0){
-            auto neighbor = env.getCellByID(j);
-            if(!neighbor->isObstacle()){
-                updatedNeighbors.push_back(neighbor);
-            }
+    //iterate through the row in the adjacency matrix and set each cell with a connection as a neighbor
+    for(const auto& pair : adjMatrix[this->id]){
+        Cell* neighbor = env.getCellByID(pair.first);
+        if(neighbor != nullptr && !neighbor->isObstacle()){
+            neighbors.push_back(neighbor);
         }
     }
+}
 
-    /*use move to update neighbors list, more efficient than previous code*/
-    this->neighbors = std::move(updatedNeighbors);
+void Cell::removeNeighbor(const Cell* c){
+    //remove a neighbor from the adjacency list
+    auto it = std::find(neighbors.begin(), neighbors.end(), c);
+
+    if(it!=neighbors.end())
+        neighbors.erase(it);
 }
 
 bool Cell::isObstacle(){
-    if(this->type == cellType::CELL_OBSTACLE){
-        return true;
-    }
-    return false;
+    //return true if the cell is an obstacle
+    return obstacle;
+}
+
+bool Cell::isCellTransient(){
+    //return true if the cell is a transient obstacle
+    return isTransient;
 }
 
 bool Cell::isGoal(){
-    return this->type==cellType::CELL_GOAL;
+    //return true if the cell is a goal
+    return goal;
+}
+
+void Cell::setTransient(){
+    /*mark a cell as a transient obstacle*/
+    isTransient = true;
+}
+
+void Cell::setObstacle(){
+    //mark a cell as an obstacle
+    obstacle = true;
+}
+
+void Cell::removeObstacle(){
+    //remove obstacle property from cell
+    obstacle = false;
+}
+
+void Cell::removeTransient(){
+    //remove dynamic obstacle property from cell
+    isTransient = false;
 }
 
 void Cell::logType(){
-
-    std::string strType = "";
-
-    switch ((type))
-    {
-    case cellType::CELL_FREE:
-        strType = "FREE";
-        break;
-
-    case cellType::CELL_OBSTACLE:
-        strType = "OBSTACLE";
-        break;
-
-    case cellType::CELL_ROBOT:
-        strType = "ROBOT";
-        break;
-
-    case cellType::CELL_GOAL:
-        strType = "GOAL";
-        break;
-    
-    default:
-        break;
+    //print out the type of the cell
+    if(obstacle){
+        std::cout<<"OBSTACLE\n";
+    }
+    if(isTransient){
+        std::cout<<"DYNAMIC OBSTACLE\n";
+    }
+    if(goal){
+        std::cout<<"DYNAMIC\n";
     }
 
-    std::cout<<strType<<std::endl;
+    if(!isObstacle() && !isGoal() && !isCellTransient()){
+        std::cout<<"FREE CELL\n";
+    }
 }
 
-void Cell::logPos(){
-    std::cout<<"("<<x<<","<<y<<")";
+std::ostream& operator<<(std::ostream& str, const Cell& c){
+    str<<"{"<<c.x<<","<<c.y<<"}";
+        
+    return str;
 }

@@ -1,10 +1,9 @@
 links := -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 -lconfig++
-opts := -Wall -Wextra -Wpedantic -g
+opts := -Wall -Wextra -Wpedantic -std=c++17 -march=native -Wno-unused-variable -Wno-unused-private-field
 compiler := clang++
 
 sim: main.cpp environment.cpp cell.cpp robot.cpp
-
-	${compiler} $^ -o $@.o ${opts} ${links}
+	${compiler} $^ -o sim ${opts} ${links}
 
 clean:
-	rm *.o
+	rm sim

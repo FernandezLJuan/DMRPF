@@ -1,7 +1,6 @@
 #pragma once
 #include "environment.h"
-#include <format>
-#include <stack>
+#include <queue>
 #include <unordered_set>
 
 class Env;
@@ -10,64 +9,87 @@ class Cell;
 class Robot
 {
 public:
-    Robot(std::shared_ptr<Cell> cell,Env* env): id(assignID()), environment(env), currentCell(cell){
+    Robot(Cell* cell,Env* env, float delayProb): id(assignID()), waitProbability(delayProb), environment(env), currentCell(cell){
         lastCell = currentCell;
-        path.push_back(currentCell);
-        pathHistory.push_back(currentCell);
+        /* path.push_back(currentCell);
+        pathHistory.push_back(currentCell); */
         this->updateDetectionArea();
 
         leader = nullptr;
         follower = nullptr;
+        goal = nullptr;
+
+        giveWayNode = nullptr;
+        freeNeighboringNode = nullptr;
+
+        givingWay = false;
+        done = false;
+        noConflictDetected = true;
 
         plannedAction = 1;
-        numberFollowers = 0;
+        pathLength = 0;
+        nodeRequests = 0;
+        
+        ruleCount = {0,0,0,0,0,0};
+        conflictCount = {0,0};
+        waitingSteps = 0;
+
+        noTransientMoves = 0;
     }
 
     static void resetID(){
         currentID = 0;
     }
 
-    void generatePath(); /*generate path between two positions*/
+    bool atGoal();                       // Is the robot at its goal?
+    bool isMoving();                     // Is the robot currently moving?
+    bool isGivingWay();                  // Is the robot giving way to another?
+    bool isInFollowerChain(Robot*);      // Is the given robot in the follower chain?
+    bool isInPath(Cell*);                // Is a given cell part of the robot's path?
 
-    bool atGoal(); /*is the robot at goal?*/
-    bool isMoving();
-    bool isGivingWay();
-    void stopRobot();
-    void resumeRobot();
-    void reconstructPath(std::unordered_map<std::shared_ptr<Cell>, std::shared_ptr<Cell>>, std::shared_ptr<Cell>);
-    void findFollowers();
-    bool isInFollowerChain(Robot*);
-    void giveWay();
-    void retreat();
-    void solveIntersectionConflict(Robot*);
-    void solveOppositeConflict(Robot*);
+    void stopRobot();                    // Stop the robot
+    void resumeRobot();                  // Resume the robot's movement
+    Cell* step();                        // Get the next step in the path
+    void giveWay();                      // Allow another robot to proceed
 
-    Robot* determinePriority(Robot*, Robot*);
-
-    void updateDetectionArea();
-    bool findGiveWayNode();
+    void resetPath();                    // resets pathHistory and pathLength, then remakesPath
+    void generatePath();                 // Generate a path between two positions
+    void reconstructPath(std::unordered_map<Cell*, Cell*>&, Cell*); // Reconstruct a path from a map
+    void insertCell(Cell* c);
+    float relativePathSize();           // Compare initial path to history
+    const std::vector<Cell*>& getPath(); // Get the robot's current path
+    void logPath();                      // Log the path
+	void logHistory();					 // Logh the history
     void takeAction();
-    std::shared_ptr<Cell> step();/*next step in path*/
 
-    void fetchNeighborInfo();
+    Cell* getGoal();                     // get the current goal
+    bool setGoal(Cell*);                 // set a goal for the robot
+    void removeGoal();                   // remove the current goal
+    bool findGiveWayNode();              // find a node to give way
 
-    /*GETTERS AND SETTERS*/
-    int getID();
-    int getNFollowers();
-    int getNeighborsRequestingNode(); /*return how many neighbors are requesting this node*/
-    std::array<int, 2> getPos(); /*get x,y position on the grid (is it redundant?)*/
-    std::shared_ptr<Cell> getCurrentCell();
-    std::vector<std::shared_ptr<Cell>> getArea(); /*retyurn detection area, used for drawing*/
-    std::shared_ptr<Cell> getGoal();
-    std::vector<std::shared_ptr<Cell>> getPath();
-    void setPos(std::shared_ptr<Cell>);
-    void logPos();
-    void setGoal(std::shared_ptr<Cell>);/*set goal at x,y position*/
-    void removeGoal();
-    void setLeader(Robot*);
-    void setFollower(Robot*);
-    Robot* getLeader();
-    void logPath();
+    void setFollower(Robot*);               // set the robot's follower
+    int getNFollowers();                    // number of followers
+    void findFollowers();                   // identify the robot's followers
+    void solveIntersectionConflict(Robot*); // resolve a conflict at an intersection
+    void solveOppositeConflict(Robot*);     // resolve a conflict with an opposing robot
+    Robot* determinePriority(Robot*, Robot*); // Determine priority between robots
+
+    void updateDetectionArea();          // update the detection area of the robot
+    const std::vector<Cell*>& getArea(); // get the detection area (used for drawing)
+    void findNeighbors();                 // update neighbors from the environment
+    int getNeighborsRequestingNode();    // count how many neighbors are requesting this node
+    void fetchNeighborInfo();            // fetch information from neighboring robots
+    const std::vector<Robot*>& getNeighbors();
+
+    int getID();                         // get the robot's ID
+    std::array<int, 2> getPos();         // get the robot's position on the grid
+    Cell* getCurrentCell();              // get the current cell
+    const std::array<int, 6> getRuleCount(); // get activation count for rules
+    const std::array<int, 2> getConflictCount(); //get detection count for conflicts
+    size_t totalRequests();          // returns average of nodeRequests per time step
+    void logPos();                       // log the robot's position
+
+    friend std::ostream& operator<<(std::ostream& str, const Robot& r);
 
 private:
 
@@ -76,32 +98,43 @@ private:
     }
 
     static int currentID;
+    
+    int id, numberFollowers, plannedAction;
+    bool noConflictDetected, givingWay, done;
 
-    int id;
-    int numberFollowers;
+    int waitingSteps;
+    int noTransientMoves;
 
-    bool moving = true; /*in case robot needs to be stopped before arriving at goal*/
-    int plannedAction; /*0 wait, 1 move*/
+    float pathLength;
 
-    void move(std::shared_ptr<Cell>); /*move to a new position, only one cell at a time*/
+    void move(Cell*); /*move to a new position, only one cell at a time*/
     void followPath(); /*follow generated path*/
 
     const int detectionRadius = 2; /*radius in which the robot can detect another robot*/
-    const float waitProbability = 0.00f; /*probability of the robot not moving this time step*/
+    const float waitProbability; /*probability of the robot not moving this time step*/
 
-    std::shared_ptr<Cell> goal; /*where does the robot want to move to*/
-    std::shared_ptr<Cell> giveWayNode; /*node to move back and give way to a robot of more priority*/
+    Cell* goal; /*where does the robot want to move to*/
+    Cell* giveWayNode; /*node to move back and give way to a robot of more priority*/
+    Cell* freeNeighboringNode;
+    std::set<Cell*> blacklistedCells;
 
     Env* environment; /*environment the robot is on*/
 
-    std::shared_ptr<Cell> currentCell; /*in which cell is the robot currently?*/
-    std::shared_ptr<Cell> lastCell; /*last cell the robot has been in*/
-    std::vector<std::shared_ptr<Cell>> path; /*path the robot follows when moving*/
-    std::vector<std::shared_ptr<Cell>> pathHistory;
-    std::vector<std::shared_ptr<Cell>> detectionArea; /*cells in which the robot can detect robots*/
+    Cell* currentCell; /*in which cell is the robot currently?*/
+    Cell* lastCell; /*last cell the robot has been in*/
+    std::vector<Cell*> path; /*path the robot follows when moving*/
+    std::vector<Cell*> pathHistory;
+    std::vector<Cell*> detectionArea; /*cells in which the robot can detect robots*/
     std::vector<Robot*> neighborsRequestingNode; /*robots requesting the current node*/
     std::vector<Robot*> neighbors; /*robots inside detection area*/
 
+    size_t nodeRequests; /*number of neighbors requesting node, updated on each call to findFollowers*/
+
+    std::array<int, 6> ruleCount; /*counts, locally, how many times each rule has been triggered*/
+    std::array<int, 2> conflictCount; /*counts, locally, how many times each conflict type has been detected*/
+
     Robot* leader; /*pointer to leader of the chain*/
     Robot* follower; /*pointer to the nearest follower*/
+
+    std::vector<Robot*> followers;
 };
