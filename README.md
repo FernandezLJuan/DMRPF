@@ -51,8 +51,8 @@ application:{
 }
 
 ```
-The map must be placed inside the `../maps/` directory, relative to the `environment.cpp` file. If no map name is provided, the code will default to using the map called *Covelo*. This will generate a map of rowsxcols dimensions, where static
-obstacles will randomly generate with a probability of 'obsProb'.
+The map must be placed inside the `../maps/` directory, relative to the `environment.cpp` file. If no map name is provided, the code will default to using the map called *Covelo*. This will generate a map of rows $\times$ cols dimensions, where static
+obstacles will randomly generate at each cell with a probability of 'obsProb'.
 
 Depending on the map you're using, you can customize parameters like `cellDims` and `origin`. For example, the *den520d* map has large dimensions of $256\times 256$, so setting the `cellDims` to `3x3` pixels allows the entire map to fit inside a 900x900 window.
 
