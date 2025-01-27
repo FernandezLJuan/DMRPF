@@ -29,7 +29,7 @@ Make sure you have the following installed:
 ## Running the Simulator
 
 ### Configuration File (`default.cfg`)
-The simulator uses a configuration file named `default.cfg` to set up the environment and other parameters at runtime. This file defines settings like the window size, grid dimensions, obstacle probabilities, and the number of robots. Below is an example configuration:
+The simulator uses a configuration file named `default.cfg` to set up the environment and other parameters at runtime. This file defines settings such as the window size, grid dimensions, obstacle probabilities, and the number of robots. Below is an example configuration:
 
 ```plaintext
 application:{
